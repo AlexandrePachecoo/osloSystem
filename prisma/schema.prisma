@@ -1,0 +1,140 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+// Prisma 7: as URLs de conexão não ficam no schema.
+// - Runtime: adapter pg com DATABASE_URL (pooled, Supavisor 6543) em src/lib/prisma.ts
+// - Migrations: DIRECT_URL (5432) configurada em prisma.config.ts
+datasource db {
+  provider = "postgresql"
+}
+
+enum Prioridade {
+  baixa
+  media
+  alta
+  urgente
+}
+
+enum ServicoStatus {
+  orcamento
+  aprovado
+  em_andamento
+  feito
+  rejeitado
+}
+
+enum RascunhoStatus {
+  pendente
+  aprovado
+  enviado
+  descartado
+}
+
+enum FuncionarioStatus {
+  ativo
+  inativo
+}
+
+model Empresa {
+  id          String    @id @default(cuid())
+  nome        String
+  contato     String?
+  categoria   String?
+  observacoes String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  servicos    Servico[]
+}
+
+model Funcionario {
+  id        String            @id @default(cuid())
+  nome      String
+  funcao    String
+  contato   String?
+  status    FuncionarioStatus @default(ativo)
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+}
+
+model ItemEstoque {
+  id               String   @id @default(cuid())
+  nome             String
+  quantidade       Int      @default(0)
+  quantidadeMinima Int      @default(0)
+  unidade          String
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model Servico {
+  id              String             @id @default(cuid())
+  titulo          String
+  descricao       String?
+  valorOrcamento  Decimal?           @db.Decimal(12, 2)
+  prioridade      Prioridade         @default(media)
+  status          ServicoStatus      @default(orcamento)
+  statusChangedAt DateTime           @default(now())
+  empresaId       String?
+  empresa         Empresa?           @relation(fields: [empresaId], references: [id], onDelete: SetNull)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  statusLogs      ServicoStatusLog[]
+  lembretes       Lembrete[]
+
+  @@index([status])
+  @@index([statusChangedAt])
+}
+
+model ServicoStatusLog {
+  id         String         @id @default(cuid())
+  servicoId  String
+  servico    Servico        @relation(fields: [servicoId], references: [id], onDelete: Cascade)
+  deStatus   ServicoStatus? // null no log de criação
+  paraStatus ServicoStatus
+  createdAt  DateTime       @default(now())
+
+  @@index([servicoId])
+}
+
+model Lembrete {
+  id        String   @id @default(cuid())
+  servicoId String
+  servico   Servico  @relation(fields: [servicoId], references: [id], onDelete: Cascade)
+  mensagem  String
+  resolvido Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // Índice parcial (1 lembrete NÃO resolvido por serviço) criado à mão na
+  // migration: lembrete_um_ativo_por_servico. Prisma não expressa índice parcial.
+  @@index([resolvido])
+  @@index([servicoId])
+}
+
+model Relatorio {
+  id            String   @id @default(cuid())
+  periodoInicio DateTime
+  periodoFim    DateTime
+  dados         Json
+  resumo        String
+  createdAt     DateTime @default(now())
+
+  // idempotência do cron semanal: 1 relatório por período
+  @@unique([periodoInicio, periodoFim])
+}
+
+model MensagemWhatsApp {
+  id               String         @id @default(cuid())
+  textoOriginal    String
+  autor            String
+  externalId       String?        @unique // id no provider — dedupe na ingestão
+  prioridade       Prioridade?
+  rascunhoResposta String?
+  rascunhoStatus   RascunhoStatus @default(pendente)
+  recebidaEm       DateTime       @default(now())
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@index([rascunhoStatus])
+}
