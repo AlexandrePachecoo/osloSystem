@@ -38,6 +38,17 @@ src/
 - Auth simples: senha única (`ADMIN_PASSWORD`) + cookie HMAC (`AUTH_SECRET`).
 - Exclusão de serviço permitida apenas em `orcamento`, `feito` ou `rejeitado`.
 
+## Fase 2 — implementada
+
+- **Relatório semanal** (`Relatorio`): serviços por status, prioridades alta/urgente pendentes,
+  lembretes ativos, estoque abaixo do mínimo e movimentações de status da semana.
+  Gravado no banco (`dados` JSON) + resumo em markdown pronto para envio (botão copiar no painel).
+- Cron semanal `/api/cron/relatorio-semanal` (`0 23 * * 0` UTC = domingo 20h BRT).
+  O período é a semana corrente em BRT (segunda 00:00 → segunda 00:00), determinístico —
+  reexecutar faz upsert do mesmo registro (unique por período), nunca duplica.
+- Geração sob demanda: botão "Gerar relatório da semana" em `/relatorios`
+  (ou `curl -H "Authorization: Bearer $CRON_SECRET" /api/cron/relatorio-semanal`).
+
 ## Rodando local
 
 1. Dependências: `npm install` (o `postinstall` gera o Prisma Client).
@@ -68,8 +79,7 @@ src/
 
 ## Próximas fases
 
-- **Fase 2** — relatório semanal (cron domingo 20h BRT + endpoint sob demanda, tabela `Relatorio`).
-- **Fase 3** — CRUD de Estoque, Funcionários e Empresas; estoque abaixo do mínimo no relatório.
+- **Fase 3** — CRUD de Estoque, Funcionários e Empresas (o relatório já inclui estoque abaixo do mínimo; falta a tela de cadastro).
 - **Fase 4** — assistente de WhatsApp (interface `WhatsAppProvider` + mock, classificação/rascunhos via OpenAI, aprovação manual).
 
 O schema do banco já cobre todas as entidades das fases futuras.

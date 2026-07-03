@@ -5,6 +5,7 @@ const LINKS = [
   { href: '/', label: 'Painel' },
   { href: '/servicos', label: 'Serviços' },
   { href: '/lembretes', label: 'Lembretes' },
+  { href: '/relatorios', label: 'Relatórios' },
 ];
 
 export function Nav() {
