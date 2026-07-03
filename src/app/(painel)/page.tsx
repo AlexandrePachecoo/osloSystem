@@ -6,7 +6,7 @@ import type { ServicoStatus } from '@/generated/prisma/enums';
 export const dynamic = 'force-dynamic';
 
 export default async function DashboardPage() {
-  const [porStatus, lembretes] = await Promise.all([
+  const [porStatus, lembretes, itensEstoque] = await Promise.all([
     prisma.servico.groupBy({ by: ['status'], _count: { _all: true } }),
     prisma.lembrete.findMany({
       where: { resolvido: false },
@@ -14,7 +14,12 @@ export default async function DashboardPage() {
       take: 5,
       include: { servico: { select: { id: true, titulo: true } } },
     }),
+    prisma.itemEstoque.findMany({ select: { quantidade: true, quantidadeMinima: true } }),
   ]);
+
+  const estoqueAbaixoMinimo = itensEstoque.filter(
+    (i) => i.quantidade < i.quantidadeMinima,
+  ).length;
 
   const contagem = new Map<ServicoStatus, number>(
     porStatus.map((g) => [g.status, g._count._all]),
@@ -23,6 +28,18 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-8">
       <h1 className="text-2xl font-semibold">Painel</h1>
+
+      {estoqueAbaixoMinimo > 0 && (
+        <Link
+          href="/estoque"
+          className="block rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800 hover:border-red-300"
+        >
+          {estoqueAbaixoMinimo === 1
+            ? '1 item de estoque está abaixo do mínimo.'
+            : `${estoqueAbaixoMinimo} itens de estoque estão abaixo do mínimo.`}{' '}
+          Ver estoque →
+        </Link>
+      )}
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         {STATUS_ORDEM.map((status) => (

@@ -6,6 +6,9 @@ const LINKS = [
   { href: '/servicos', label: 'Serviços' },
   { href: '/lembretes', label: 'Lembretes' },
   { href: '/relatorios', label: 'Relatórios' },
+  { href: '/estoque', label: 'Estoque' },
+  { href: '/funcionarios', label: 'Funcionários' },
+  { href: '/empresas', label: 'Empresas' },
 ];
 
 export function Nav() {
