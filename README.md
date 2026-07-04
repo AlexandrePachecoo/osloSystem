@@ -58,6 +58,28 @@ src/
 - CRUD de **Empresas** (`/empresas`): contagem de serviços vinculados; excluir empresa preserva
   os serviços (FK `SetNull`). Empresas aparecem no select do formulário de serviço.
 
+## Fase 4 — implementada
+
+- **Fila de WhatsApp** (`/whatsapp`): mensagem recebida → classificação de prioridade e rascunho
+  de resposta via OpenAI → entra como `pendente`. **Nada é enviado automaticamente** — aprovar,
+  marcar como enviada e descartar são ações manuais (`pendente → aprovado → enviado`,
+  `descartado` a partir de pendente/aprovado). Prioridade e rascunho são editáveis no painel.
+- **Ingestão abstraída**: interface `WhatsAppProvider` (`src/lib/whatsapp/provider.ts`) com
+  implementação mock que apenas loga. O ponto de troca para o provider real (Meta Cloud API ou
+  Baileys) está em `src/lib/whatsapp/index.ts`; o ponto exato do envio real está comentado em
+  `src/actions/mensagens.ts` (ação "Marcar como enviada").
+- **Alimentação do mock**: formulário "Simular mensagem recebida" no painel e endpoint
+  `POST /api/whatsapp/ingest` (Bearer `CRON_SECRET`), com dedupe por `externalId`:
+  ```bash
+  curl -X POST http://localhost:3000/api/whatsapp/ingest \
+    -H "Authorization: Bearer $CRON_SECRET" -H "Content-Type: application/json" \
+    -d '{"autor":"Maria (302)","texto":"Vazamento na garagem","externalId":"wamid.1"}'
+  ```
+- **Tolerante a falha da IA**: a mensagem é salva ANTES da chamada à OpenAI; sem
+  `OPENAI_API_KEY` (ou com erro/timeout), entra na fila sem classificação e o admin preenche
+  manualmente. Modelo configurável via `OPENAI_MODEL` (default `gpt-4o-mini`), saída
+  estruturada (JSON Schema), prompt em `src/lib/openai.ts`.
+
 ## Rodando local
 
 1. Dependências: `npm install` (o `postinstall` gera o Prisma Client).
@@ -86,8 +108,9 @@ src/
 4. Os crons estão declarados em `vercel.json` (lembretes: `0 11 * * *` UTC = 08h BRT).
 5. Deploy. O `postinstall` roda `prisma generate` no build.
 
-## Próximas fases
+## Próximos passos (fora do escopo das 4 fases)
 
-- **Fase 4** — assistente de WhatsApp (interface `WhatsAppProvider` + mock, classificação/rascunhos via OpenAI, aprovação manual).
-
-O schema do banco já cobre todas as entidades das fases futuras.
+- Plugar o provider real de WhatsApp (Meta Cloud API ou Baileys) implementando
+  `WhatsAppProvider` e o webhook de ingestão.
+- Envio externo de lembretes e do relatório semanal (e-mail/WhatsApp).
+- Testes automatizados (as funções de `src/domain/` são puras e prontas para unit test).

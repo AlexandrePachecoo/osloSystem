@@ -3,11 +3,15 @@ import { SESSION_COOKIE, isValidSessionToken } from '@/lib/session';
 
 // Protege todo o painel. Fora da proteção:
 // - /login (página + action de login)
-// - /api/cron/* (protegidas por CRON_SECRET na própria rota)
+// - /api/cron/* e /api/whatsapp/ingest (protegidas por CRON_SECRET na própria rota)
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (pathname === '/login' || pathname.startsWith('/api/cron/')) {
+  if (
+    pathname === '/login' ||
+    pathname.startsWith('/api/cron/') ||
+    pathname === '/api/whatsapp/ingest'
+  ) {
     return NextResponse.next();
   }
 
