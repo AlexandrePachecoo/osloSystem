@@ -9,6 +9,7 @@ const LINKS = [
   { href: '/estoque', label: 'Estoque' },
   { href: '/funcionarios', label: 'Funcionários' },
   { href: '/empresas', label: 'Empresas' },
+  { href: '/whatsapp', label: 'WhatsApp' },
 ];
 
 export function Nav() {
