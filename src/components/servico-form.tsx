@@ -92,9 +92,6 @@ export function ServicoForm({
             </option>
           ))}
         </select>
-        <span className="mt-1 block text-xs text-slate-400">
-          Cadastro de empresas chega na Fase 3.
-        </span>
       </label>
 
       {state.error && <p className="text-sm text-red-600">{state.error}</p>}

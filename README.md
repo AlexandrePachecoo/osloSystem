@@ -49,6 +49,15 @@ src/
 - Geração sob demanda: botão "Gerar relatório da semana" em `/relatorios`
   (ou `curl -H "Authorization: Bearer $CRON_SECRET" /api/cron/relatorio-semanal`).
 
+## Fase 3 — implementada
+
+- CRUD de **Estoque** (`/estoque`): destaque visual (linha vermelha + badge) para itens com
+  `quantidade < quantidadeMinima`, alerta na listagem e no dashboard. Já alimenta o relatório semanal.
+- CRUD de **Funcionários** (`/funcionarios`): status ativo/inativo com badge; exclusão sugere
+  inativar em vez de apagar.
+- CRUD de **Empresas** (`/empresas`): contagem de serviços vinculados; excluir empresa preserva
+  os serviços (FK `SetNull`). Empresas aparecem no select do formulário de serviço.
+
 ## Rodando local
 
 1. Dependências: `npm install` (o `postinstall` gera o Prisma Client).
@@ -79,7 +88,6 @@ src/
 
 ## Próximas fases
 
-- **Fase 3** — CRUD de Estoque, Funcionários e Empresas (o relatório já inclui estoque abaixo do mínimo; falta a tela de cadastro).
 - **Fase 4** — assistente de WhatsApp (interface `WhatsAppProvider` + mock, classificação/rascunhos via OpenAI, aprovação manual).
 
 O schema do banco já cobre todas as entidades das fases futuras.
