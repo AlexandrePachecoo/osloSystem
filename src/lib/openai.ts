@@ -27,11 +27,14 @@ const SYSTEM_PROMPT = `Você é o assistente da administração de um condomíni
 
 2. Escrever um rascunho de resposta em português do Brasil, com tom cordial e objetivo: educado e direto, sem formalidade excessiva. 1 a 3 frases. Cumprimente a pessoa pelo nome quando fizer sentido. Não invente prazos ou compromissos específicos que a administração talvez não cumpra — prefira "vamos verificar" a "resolveremos hoje às 15h". Não assine a mensagem.
 
+Quando houver "Situação atual do condomínio" abaixo, use essas informações no rascunho: se a mensagem falar de um problema que já tem serviço em andamento, diga que a questão já está sendo tratada; se houver aviso registrado que responda à dúvida (ex.: evento agendado), responda com base nele. Não mencione informações internas irrelevantes para a mensagem.
+
 O rascunho será revisado e editado por um humano antes de qualquer envio.`;
 
 export async function classificarMensagem(
   autor: string,
   texto: string,
+  contexto?: string | null,
 ): Promise<ClassificacaoIA | null> {
   if (!env.OPENAI_API_KEY) {
     console.warn('[openai] OPENAI_API_KEY ausente — mensagem entra na fila sem classificação');
@@ -48,7 +51,12 @@ export async function classificarMensagem(
       body: JSON.stringify({
         model: env.OPENAI_MODEL,
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          {
+            role: 'system',
+            content: contexto
+              ? `${SYSTEM_PROMPT}\n\nSituação atual do condomínio:\n\n${contexto}`
+              : SYSTEM_PROMPT,
+          },
           { role: 'user', content: `Mensagem de ${autor}:\n\n${texto}` },
         ],
         response_format: {

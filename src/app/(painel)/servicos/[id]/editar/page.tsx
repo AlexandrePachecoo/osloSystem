@@ -35,6 +35,8 @@ export default async function EditarServicoPage({
           valorOrcamento: servico.valorOrcamento?.toString(),
           prioridade: servico.prioridade,
           empresaId: servico.empresaId ?? undefined,
+          empresaNome: servico.empresaNome ?? undefined,
+          lembreteDias: servico.lembreteDias?.toString(),
         }}
       />
     </div>

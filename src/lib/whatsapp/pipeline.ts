@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma';
 import { classificarMensagem } from '@/lib/openai';
+import { montarContextoSistema } from '@/lib/contexto-ia';
 import type { MensagemEntrada } from '@/lib/whatsapp/provider';
 
 // Pipeline de ingestão: mensagem recebida → salva → classifica prioridade e
@@ -24,7 +25,15 @@ export async function processarMensagemRecebida(entrada: MensagemEntrada) {
     },
   });
 
-  const classificacao = await classificarMensagem(entrada.autor, entrada.texto);
+  // A IA responde olhando o estado do sistema: serviços em aberto e avisos
+  // registrados pela administração. Falha ao montar o contexto não derruba a
+  // classificação — segue sem contexto.
+  const contexto = await montarContextoSistema().catch((error) => {
+    console.error('[whatsapp] falha ao montar contexto do sistema:', error);
+    return null;
+  });
+
+  const classificacao = await classificarMensagem(entrada.autor, entrada.texto, contexto);
   if (!classificacao) {
     return { mensagem, duplicada: false };
   }

@@ -1,12 +1,19 @@
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
+import { env } from '@/lib/env';
 import { STATUS_LABEL, STATUS_ORDEM, formatarData } from '@/lib/format';
+import { AssistenteChat } from '@/components/assistente-chat';
+import { EstoqueRapido } from '@/components/estoque-rapido';
+import { NotaContextoForm } from '@/components/nota-contexto-form';
+import { desativarNotaContexto } from '@/actions/assistente';
 import type { ServicoStatus } from '@/generated/prisma/enums';
 
 export const dynamic = 'force-dynamic';
+// O assistente pode encadear várias chamadas à OpenAI numa mensagem.
+export const maxDuration = 60;
 
 export default async function DashboardPage() {
-  const [porStatus, lembretes, itensEstoque] = await Promise.all([
+  const [porStatus, lembretes, itensEstoque, notas] = await Promise.all([
     prisma.servico.groupBy({ by: ['status'], _count: { _all: true } }),
     prisma.lembrete.findMany({
       where: { resolvido: false },
@@ -14,7 +21,21 @@ export default async function DashboardPage() {
       take: 5,
       include: { servico: { select: { id: true, titulo: true } } },
     }),
-    prisma.itemEstoque.findMany({ select: { quantidade: true, quantidadeMinima: true } }),
+    prisma.itemEstoque.findMany({
+      select: {
+        id: true,
+        nome: true,
+        quantidade: true,
+        quantidadeMinima: true,
+        unidade: true,
+      },
+      orderBy: { nome: 'asc' },
+    }),
+    prisma.notaContexto.findMany({
+      where: { ativo: true },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    }),
   ]);
 
   const estoqueAbaixoMinimo = itensEstoque.filter(
@@ -54,6 +75,47 @@ export default async function DashboardPage() {
         ))}
       </section>
 
+      <div className="grid gap-6 lg:grid-cols-2">
+        <AssistenteChat disponivel={Boolean(env.OPENAI_API_KEY)} />
+
+        <div className="space-y-6">
+          <EstoqueRapido itens={itensEstoque} />
+
+          <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
+            <div>
+              <h2 className="text-sm font-semibold text-slate-600">Contexto da IA</h2>
+              <p className="text-xs text-slate-400">
+                Avisos e informações que a IA usa ao responder moradores no WhatsApp.
+              </p>
+            </div>
+            <NotaContextoForm />
+            {notas.length === 0 ? (
+              <p className="text-sm text-slate-500">Nenhuma informação registrada.</p>
+            ) : (
+              <ul className="divide-y divide-slate-100">
+                {notas.map((n) => (
+                  <li key={n.id} className="flex items-start justify-between gap-3 py-2 text-sm">
+                    <div>
+                      <p className="text-slate-700">{n.texto}</p>
+                      <p className="mt-0.5 text-xs text-slate-400">{formatarData(n.createdAt)}</p>
+                    </div>
+                    <form action={desativarNotaContexto}>
+                      <input type="hidden" name="id" value={n.id} />
+                      <button
+                        type="submit"
+                        className="text-xs text-slate-400 hover:text-red-600"
+                      >
+                        Remover
+                      </button>
+                    </form>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </div>
+      </div>
+
       <section>
         <div className="mb-3 flex items-center justify-between">
           <h2 className="text-lg font-medium">Lembretes ativos</h2>
@@ -70,9 +132,13 @@ export default async function DashboardPage() {
                 key={l.id}
                 className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm"
               >
-                <Link href={`/servicos/${l.servico.id}`} className="hover:underline">
-                  {l.mensagem}
-                </Link>
+                {l.servico ? (
+                  <Link href={`/servicos/${l.servico.id}`} className="hover:underline">
+                    {l.mensagem}
+                  </Link>
+                ) : (
+                  <span>{l.mensagem}</span>
+                )}
                 <span className="ml-2 text-xs text-slate-500">{formatarData(l.createdAt)}</span>
               </li>
             ))}

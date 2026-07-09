@@ -20,10 +20,14 @@ export async function criarServico(_prev: ActionState, formData: FormData): Prom
     valorOrcamento: formData.get('valorOrcamento') || null,
     prioridade: formData.get('prioridade'),
     empresaId: formData.get('empresaId'),
+    empresaNome: formData.get('empresaNome'),
+    lembreteDias: formData.get('lembreteDias') || null,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
   }
+  // Empresa cadastrada tem precedência sobre o nome livre.
+  if (parsed.data.empresaId) parsed.data.empresaNome = null;
 
   const servico = await prisma.$transaction(async (tx) => {
     const criado = await tx.servico.create({ data: parsed.data });
@@ -45,10 +49,13 @@ export async function atualizarServico(_prev: ActionState, formData: FormData): 
     valorOrcamento: formData.get('valorOrcamento') || null,
     prioridade: formData.get('prioridade'),
     empresaId: formData.get('empresaId'),
+    empresaNome: formData.get('empresaNome'),
+    lembreteDias: formData.get('lembreteDias') || null,
   });
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
   }
+  if (parsed.data.empresaId) parsed.data.empresaNome = null;
 
   const { id, ...data } = parsed.data;
   await prisma.servico.update({ where: { id }, data });

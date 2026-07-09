@@ -76,8 +76,14 @@ model Servico {
   prioridade      Prioridade         @default(media)
   status          ServicoStatus      @default(orcamento)
   statusChangedAt DateTime           @default(now())
+  // Dias sem mudança de status até gerar novo lembrete.
+  // null = usa o default global (LEMBRETE_DIAS_SEM_MUDANCA).
+  lembreteDias    Int?
   empresaId       String?
   empresa         Empresa?           @relation(fields: [empresaId], references: [id], onDelete: SetNull)
+  // Empresa não cadastrada (texto livre) — ex.: orçamento avulso.
+  // Ignorada quando empresaId está preenchido.
+  empresaNome     String?
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
   statusLogs      ServicoStatusLog[]
@@ -100,16 +106,31 @@ model ServicoStatusLog {
 
 model Lembrete {
   id        String   @id @default(cuid())
-  servicoId String
-  servico   Servico  @relation(fields: [servicoId], references: [id], onDelete: Cascade)
+  // null = lembrete manual (criado pelo admin ou pelo assistente), sem serviço.
+  servicoId String?
+  servico   Servico? @relation(fields: [servicoId], references: [id], onDelete: Cascade)
   mensagem  String
   resolvido Boolean  @default(false)
   createdAt DateTime @default(now())
 
   // Índice parcial (1 lembrete NÃO resolvido por serviço) criado à mão na
   // migration: lembrete_um_ativo_por_servico. Prisma não expressa índice parcial.
+  // NULLs não colidem no índice — lembretes manuais podem coexistir à vontade.
   @@index([resolvido])
   @@index([servicoId])
+}
+
+// Informações avulsas que alimentam a IA (assistente do painel e respostas do
+// WhatsApp) — ex.: "festa junina no salão dia 12/09 às 19h". Desativar tira a
+// nota do contexto sem apagar o histórico.
+model NotaContexto {
+  id        String   @id @default(cuid())
+  texto     String
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ativo])
 }
 
 model Relatorio {
