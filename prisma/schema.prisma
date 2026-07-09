@@ -149,6 +149,7 @@ model MensagemWhatsApp {
   id               String         @id @default(cuid())
   textoOriginal    String
   autor            String
+  remetente        String?        // wa_id/telefone E.164 — destino da resposta (Cloud API)
   externalId       String?        @unique // id no provider — dedupe na ingestão
   prioridade       Prioridade?
   rascunhoResposta String?

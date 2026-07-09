@@ -107,15 +107,26 @@ async function mudarStatusRascunho(
   }
 
   if (para === 'enviado') {
-    // PONTO DE ENVIO REAL: hoje o provider é o mock (só loga). Quando o
-    // provider real (Meta Cloud API ou Baileys) for plugado em
-    // lib/whatsapp/index.ts, esta chamada passa a enviar de verdade.
-    // O envio continua sendo disparado APENAS por esta ação manual.
-    await getWhatsAppProvider().enviarResposta(
-      mensagem.id,
-      mensagem.autor,
-      mensagem.rascunhoResposta ?? '',
-    );
+    // PONTO DE ENVIO REAL: disparado APENAS por esta ação manual. Com
+    // WHATSAPP_PROVIDER=meta, envia de verdade pela Cloud API; caso contrário
+    // o mock só loga. O provider real precisa do telefone de destino — sem
+    // ele (mensagens antigas ou simuladas), não dá para enviar.
+    const provider = getWhatsAppProvider();
+    if (provider.nome !== 'mock' && !mensagem.remetente) {
+      return {
+        error: 'Sem telefone do remetente — não é possível enviar pela Cloud API.',
+      };
+    }
+    try {
+      await provider.enviarResposta(
+        mensagem.id,
+        mensagem.remetente,
+        mensagem.rascunhoResposta ?? '',
+      );
+    } catch (erro) {
+      console.error('[whatsapp] falha ao enviar resposta:', erro);
+      return { error: 'Falha ao enviar a resposta pelo WhatsApp. Tente novamente.' };
+    }
   }
 
   await prisma.mensagemWhatsApp.update({
