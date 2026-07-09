@@ -20,6 +20,7 @@ export async function processarMensagemRecebida(entrada: MensagemEntrada) {
     data: {
       autor: entrada.autor,
       textoOriginal: entrada.texto,
+      remetente: entrada.remetente ?? null,
       externalId: entrada.externalId ?? null,
       recebidaEm: entrada.recebidaEm ?? new Date(),
     },
