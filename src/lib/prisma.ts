@@ -10,7 +10,15 @@ const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 function createClient() {
   // Supavisor em transaction mode: manter o pool local pequeno —
   // cada lambda precisa de poucas conexões e o pooling real é do Supabase.
-  const adapter = new PrismaPg({ connectionString: env.DATABASE_URL, max: 3 });
+  // ssl + connectionTimeoutMillis: sem isso, uma falha de rede/negociação TLS
+  // com o Supavisor fica pendurada até o timeout do SO em vez de falhar rápido
+  // com um erro claro.
+  const adapter = new PrismaPg({
+    connectionString: env.DATABASE_URL,
+    max: 3,
+    ssl: { rejectUnauthorized: false },
+    connectionTimeoutMillis: 10_000,
+  });
   return new PrismaClient({ adapter });
 }
 

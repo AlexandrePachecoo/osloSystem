@@ -68,7 +68,20 @@ export default async function ServicoDetalhePage({
         <div className="space-y-3">
           <div>
             <div className="text-xs uppercase tracking-wide text-slate-400">Empresa</div>
-            <p className="mt-1">{servico.empresa?.nome ?? '—'}</p>
+            <p className="mt-1">
+              {servico.empresa?.nome ??
+                (servico.empresaNome ? `${servico.empresaNome} (sem cadastro)` : '—')}
+            </p>
+          </div>
+          <div>
+            <div className="text-xs uppercase tracking-wide text-slate-400">
+              Avisar novamente após
+            </div>
+            <p className="mt-1">
+              {servico.lembreteDias
+                ? `${servico.lembreteDias} dias`
+                : 'Padrão do sistema'}
+            </p>
           </div>
           <div>
             <div className="text-xs uppercase tracking-wide text-slate-400">Orçamento</div>

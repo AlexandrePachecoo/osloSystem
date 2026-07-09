@@ -45,7 +45,7 @@ export async function gerarRelatorioSemanal(agora: Date = new Date()) {
     porStatus,
     prioridadesPendentes: pendentes,
     lembretesAtivos: lembretes.map((l) => ({
-      servicoTitulo: l.servico.titulo,
+      servicoTitulo: l.servico?.titulo ?? null,
       mensagem: l.mensagem,
       criadoEm: l.createdAt.toISOString(),
     })),

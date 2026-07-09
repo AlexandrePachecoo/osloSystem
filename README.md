@@ -80,6 +80,56 @@ src/
   manualmente. Modelo configurável via `OPENAI_MODEL` (default `gpt-4o-mini`), saída
   estruturada (JSON Schema), prompt em `src/lib/openai.ts`.
 
+## Fase 5 — implementada
+
+- **Empresa não cadastrada no serviço**: campo livre `empresaNome` no formulário — dá para
+  registrar um orçamento com o nome da empresa sem cadastrá-la. Se uma empresa cadastrada
+  for selecionada, o nome livre é ignorado.
+- **"Avisar novamente após (dias)" por serviço** (`lembreteDias`): sobrepõe o default global
+  do cron de lembretes. Resolver um lembrete sem mudar o status adia o próximo aviso pelo
+  mesmo prazo (contado do último lembrete).
+- **Lembretes manuais** (`/lembretes`): o admin cria lembretes avulsos ou vinculados a um
+  serviço (`Lembrete.servicoId` agora é opcional).
+- **Estoque rápido no painel**: busca por nome + adicionar/retirar unidades sem sair do
+  dashboard. Retirada é condicionada ao saldo no banco (nunca fica negativa).
+- **IA com contexto do sistema**: a classificação/rascunho do WhatsApp agora recebe os
+  serviços em aberto e as notas de contexto (`NotaContexto`) — se um morador perguntar por
+  um problema que já tem serviço em andamento, o rascunho responde com base nisso.
+- **Assistente no painel**: chat box em que o admin conversa com a IA que executa ações via
+  function calling (`src/lib/assistente.ts`): criar serviço (ex.: relato de vazamento já
+  sendo resolvido entra como "em andamento"), criar lembrete, salvar nota de contexto,
+  consultar serviços e movimentar estoque. Também há um card "Contexto da IA" para
+  alimentar/remover notas diretamente. Sem `OPENAI_API_KEY`, o chat aparece desativado e o
+  restante do painel funciona normalmente.
+
+## Fase 6 — implementada
+
+- **WhatsApp real via Meta Cloud API**: o provider mock foi complementado por um
+  provider oficial (`src/lib/whatsapp/meta-provider.ts`). A escolha é por env
+  `WHATSAPP_PROVIDER` (`mock` default | `meta`); sem as credenciais o canal cai
+  no mock e o app continua bootando normal. **Nada muda no fluxo**: a IA já
+  classifica/rascunha e o envio continua saindo APENAS pela ação manual
+  "Marcar como enviada".
+- **Webhook de ingestão** (`POST /api/whatsapp/webhook`): recebe as mensagens da
+  Meta, valida a assinatura `X-Hub-Signature-256` (HMAC-SHA256 com
+  `WHATSAPP_APP_SECRET`), normaliza cada DM de texto e reusa o mesmo pipeline do
+  mock/`ingest` (com dedupe por `externalId`). O `GET` responde ao handshake de
+  verificação (`hub.challenge`) usando `WHATSAPP_VERIFY_TOKEN`.
+- **Telefone do remetente** (`MensagemWhatsApp.remetente`): guardado na ingestão
+  para permitir a resposta 1:1 pela Cloud API. Sem ele (mensagens antigas/mock)
+  a ação de envio avisa em vez de tentar enviar.
+- **Configuração no painel da Meta**: crie o app em *Meta for Developers* com o
+  produto WhatsApp, pegue o *Phone Number ID* e um *access token permanente*
+  (System User), defina a URL do webhook como
+  `https://<seu-dominio>/api/whatsapp/webhook`, use o mesmo `WHATSAPP_VERIFY_TOKEN`
+  e **subscreva ao campo `messages`**. Preencha as envs da seção WhatsApp do
+  `.env.example`.
+- **Limitações conhecidas**: a Cloud API **não suporta grupos** — o grupo de
+  avisos (só adm/portaria) continua manual, fora do fluxo do agente. Texto livre
+  só é permitido dentro da **janela de 24h** após a última mensagem do morador
+  (respostas a DMs recebidas caem sempre nessa janela). Só mensagens de **texto**
+  são ingeridas por ora (mídia/status são ignorados).
+
 ## Rodando local
 
 1. Dependências: `npm install` (o `postinstall` gera o Prisma Client).
@@ -108,9 +158,10 @@ src/
 4. Os crons estão declarados em `vercel.json` (lembretes: `0 11 * * *` UTC = 08h BRT).
 5. Deploy. O `postinstall` roda `prisma generate` no build.
 
-## Próximos passos (fora do escopo das 4 fases)
+## Próximos passos
 
-- Plugar o provider real de WhatsApp (Meta Cloud API ou Baileys) implementando
-  `WhatsAppProvider` e o webhook de ingestão.
+- Templates aprovados para responder fora da janela de 24h; suporte a mídia
+  (imagem/áudio/documento) no webhook.
+- Alternativa para o grupo de avisos (não coberto pela Cloud API).
 - Envio externo de lembretes e do relatório semanal (e-mail/WhatsApp).
 - Testes automatizados (as funções de `src/domain/` são puras e prontas para unit test).

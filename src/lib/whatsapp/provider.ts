@@ -10,6 +10,8 @@
 export type MensagemEntrada = {
   autor: string;
   texto: string;
+  // wa_id/telefone E.164 do remetente — destino ao responder (Cloud API)
+  remetente?: string | null;
   // id da mensagem no provider (dedupe na reentrega do webhook)
   externalId?: string | null;
   recebidaEm?: Date;
@@ -18,9 +20,14 @@ export type MensagemEntrada = {
 export interface WhatsAppProvider {
   readonly nome: string;
   /**
-   * Envia a resposta aprovada ao grupo/contato de origem.
+   * Envia a resposta aprovada ao contato de origem.
    * Chamada SOMENTE pela ação manual "Marcar como enviada" — nada é
    * enviado automaticamente.
+   * @param remetente wa_id/telefone de destino; nulo em mensagens antigas/mock.
    */
-  enviarResposta(mensagemId: string, autor: string, texto: string): Promise<void>;
+  enviarResposta(
+    mensagemId: string,
+    remetente: string | null,
+    texto: string,
+  ): Promise<void>;
 }
