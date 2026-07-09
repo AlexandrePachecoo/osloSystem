@@ -36,7 +36,8 @@ export type RelatorioDados = {
     prioridade: Prioridade;
     status: ServicoStatus;
   }[];
-  lembretesAtivos: { servicoTitulo: string; mensagem: string; criadoEm: string }[];
+  // servicoTitulo null = lembrete avulso (sem serviço vinculado)
+  lembretesAtivos: { servicoTitulo: string | null; mensagem: string; criadoEm: string }[];
   estoqueAbaixoMinimo: {
     nome: string;
     quantidade: number;

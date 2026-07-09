@@ -80,6 +80,28 @@ src/
   manualmente. Modelo configurável via `OPENAI_MODEL` (default `gpt-4o-mini`), saída
   estruturada (JSON Schema), prompt em `src/lib/openai.ts`.
 
+## Fase 5 — implementada
+
+- **Empresa não cadastrada no serviço**: campo livre `empresaNome` no formulário — dá para
+  registrar um orçamento com o nome da empresa sem cadastrá-la. Se uma empresa cadastrada
+  for selecionada, o nome livre é ignorado.
+- **"Avisar novamente após (dias)" por serviço** (`lembreteDias`): sobrepõe o default global
+  do cron de lembretes. Resolver um lembrete sem mudar o status adia o próximo aviso pelo
+  mesmo prazo (contado do último lembrete).
+- **Lembretes manuais** (`/lembretes`): o admin cria lembretes avulsos ou vinculados a um
+  serviço (`Lembrete.servicoId` agora é opcional).
+- **Estoque rápido no painel**: busca por nome + adicionar/retirar unidades sem sair do
+  dashboard. Retirada é condicionada ao saldo no banco (nunca fica negativa).
+- **IA com contexto do sistema**: a classificação/rascunho do WhatsApp agora recebe os
+  serviços em aberto e as notas de contexto (`NotaContexto`) — se um morador perguntar por
+  um problema que já tem serviço em andamento, o rascunho responde com base nisso.
+- **Assistente no painel**: chat box em que o admin conversa com a IA que executa ações via
+  function calling (`src/lib/assistente.ts`): criar serviço (ex.: relato de vazamento já
+  sendo resolvido entra como "em andamento"), criar lembrete, salvar nota de contexto,
+  consultar serviços e movimentar estoque. Também há um card "Contexto da IA" para
+  alimentar/remover notas diretamente. Sem `OPENAI_API_KEY`, o chat aparece desativado e o
+  restante do painel funciona normalmente.
+
 ## Rodando local
 
 1. Dependências: `npm install` (o `postinstall` gera o Prisma Client).

@@ -24,6 +24,22 @@ export const servicoCreateSchema = z.object({
     .transform((v) => (v === '' ? null : v))
     .nullable()
     .default(null),
+  // Empresa não cadastrada (texto livre) — para orçamentos avulsos.
+  empresaNome: z
+    .string()
+    .trim()
+    .max(200)
+    .transform((v) => (v === '' ? null : v))
+    .nullable()
+    .default(null),
+  // Dias sem mudança de status até avisar de novo (null = default global).
+  lembreteDias: z.coerce
+    .number()
+    .int('Use um número inteiro de dias')
+    .positive('Dias deve ser maior que zero')
+    .max(365)
+    .nullable()
+    .default(null),
 });
 
 export const servicoUpdateSchema = servicoCreateSchema.extend({

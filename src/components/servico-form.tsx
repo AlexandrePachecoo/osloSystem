@@ -12,6 +12,8 @@ export type ServicoFormDefaults = {
   valorOrcamento?: string;
   prioridade?: Prioridade;
   empresaId?: string;
+  empresaNome?: string;
+  lembreteDias?: string;
 };
 
 export function ServicoForm({
@@ -82,16 +84,51 @@ export function ServicoForm({
         </label>
       </div>
 
+      <div className="grid grid-cols-2 gap-4">
+        <label className="block text-sm">
+          <span className="mb-1 block font-medium text-slate-700">Empresa</span>
+          <select name="empresaId" defaultValue={defaults.empresaId ?? ''} className={inputCls}>
+            <option value="">— nenhuma —</option>
+            {empresas.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.nome}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block text-sm">
+          <span className="mb-1 block font-medium text-slate-700">Empresa não cadastrada</span>
+          <input
+            name="empresaNome"
+            placeholder="Só o nome — ex.: orçamento avulso"
+            defaultValue={defaults.empresaNome}
+            className={inputCls}
+          />
+          <span className="mt-1 block text-xs text-slate-400">
+            Ignorado se uma empresa cadastrada for selecionada.
+          </span>
+        </label>
+      </div>
+
       <label className="block text-sm">
-        <span className="mb-1 block font-medium text-slate-700">Empresa</span>
-        <select name="empresaId" defaultValue={defaults.empresaId ?? ''} className={inputCls}>
-          <option value="">— nenhuma —</option>
-          {empresas.map((e) => (
-            <option key={e.id} value={e.id}>
-              {e.nome}
-            </option>
-          ))}
-        </select>
+        <span className="mb-1 block font-medium text-slate-700">
+          Avisar novamente após (dias)
+        </span>
+        <input
+          name="lembreteDias"
+          type="number"
+          min="1"
+          max="365"
+          step="1"
+          placeholder="Padrão do sistema"
+          defaultValue={defaults.lembreteDias}
+          className={inputCls}
+        />
+        <span className="mt-1 block text-xs text-slate-400">
+          Sem mudança de status nesse prazo, um lembrete é criado. Resolver o lembrete adia o
+          próximo aviso pelo mesmo prazo.
+        </span>
       </label>
 
       {state.error && <p className="text-sm text-red-600">{state.error}</p>}

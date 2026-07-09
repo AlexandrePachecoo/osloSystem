@@ -90,6 +90,7 @@ type ServicoLinha = {
   valorOrcamento: unknown;
   updatedAt: Date;
   empresa: { nome: string } | null;
+  empresaNome: string | null;
 };
 
 function Tabela({ servicos }: { servicos: ServicoLinha[] }) {
@@ -123,7 +124,9 @@ function Tabela({ servicos }: { servicos: ServicoLinha[] }) {
               <td className="px-4 py-3">
                 <PrioridadeBadge prioridade={s.prioridade} />
               </td>
-              <td className="px-4 py-3 text-slate-600">{s.empresa?.nome ?? '—'}</td>
+              <td className="px-4 py-3 text-slate-600">
+                {s.empresa?.nome ?? (s.empresaNome ? `${s.empresaNome} (sem cadastro)` : '—')}
+              </td>
               <td className="px-4 py-3 text-slate-600">{formatarMoeda(s.valorOrcamento)}</td>
               <td className="px-4 py-3 text-slate-500">{formatarData(s.updatedAt)}</td>
             </tr>
