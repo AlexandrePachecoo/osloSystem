@@ -88,9 +88,27 @@ model Servico {
   updatedAt       DateTime           @updatedAt
   statusLogs      ServicoStatusLog[]
   lembretes       Lembrete[]
+  orcamentos      Orcamento[]
 
   @@index([status])
   @@index([statusChangedAt])
+}
+
+// Orçamentos concorrentes de um serviço — ex.: "vazamento na garagem" com
+// propostas de empresas diferentes (empresa X por R$ Y, empresa A por R$ Z).
+// Um deles pode ser marcado como selecionado (a proposta escolhida).
+model Orcamento {
+  id          String   @id @default(cuid())
+  servicoId   String
+  servico     Servico  @relation(fields: [servicoId], references: [id], onDelete: Cascade)
+  fornecedor  String // nome da empresa/fornecedor (texto livre)
+  valor       Decimal  @db.Decimal(12, 2)
+  observacoes String?
+  selecionado Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([servicoId])
 }
 
 model ServicoStatusLog {

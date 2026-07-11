@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { StatusBadge, PrioridadeBadge } from '@/components/badges';
 import { StatusActions } from '@/components/status-actions';
+import { OrcamentosServico } from '@/components/orcamentos-servico';
 import { DeleteServicoButton } from '@/components/delete-servico-button';
 import { STATUS_LABEL, formatarData, formatarMoeda } from '@/lib/format';
 import { STATUS_TERMINAIS } from '@/domain/servico-status';
@@ -21,6 +22,7 @@ export default async function ServicoDetalhePage({
       empresa: { select: { nome: true } },
       statusLogs: { orderBy: { createdAt: 'desc' } },
       lembretes: { where: { resolvido: false } },
+      orcamentos: { orderBy: [{ selecionado: 'desc' }, { valor: 'asc' }] },
     },
   });
   if (!servico) notFound();
@@ -103,6 +105,23 @@ export default async function ServicoDetalhePage({
       <section className="space-y-3">
         <h2 className="text-lg font-medium">Mudar status</h2>
         <StatusActions id={servico.id} status={servico.status} />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-medium">Orçamentos</h2>
+        <p className="text-sm text-slate-500">
+          Compare propostas de empresas diferentes para este serviço e marque a escolhida.
+        </p>
+        <OrcamentosServico
+          servicoId={servico.id}
+          orcamentos={servico.orcamentos.map((o) => ({
+            id: o.id,
+            fornecedor: o.fornecedor,
+            valor: o.valor,
+            observacoes: o.observacoes,
+            selecionado: o.selecionado,
+          }))}
+        />
       </section>
 
       <section className="space-y-3">
