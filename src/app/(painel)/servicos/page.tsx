@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
-import { StatusBadge, PrioridadeBadge } from '@/components/badges';
+import { PrioridadeBadge } from '@/components/badges';
+import { StatusQuickChange } from '@/components/status-quick-change';
 import { STATUS_LABEL, STATUS_ORDEM, formatarData, formatarMoeda } from '@/lib/format';
 import { servicoStatusSchema } from '@/schemas/servico';
 import type { ServicoStatus } from '@/generated/prisma/enums';
@@ -119,7 +120,7 @@ function Tabela({ servicos }: { servicos: ServicoLinha[] }) {
                 </Link>
               </td>
               <td className="px-4 py-3">
-                <StatusBadge status={s.status} />
+                <StatusQuickChange id={s.id} status={s.status} />
               </td>
               <td className="px-4 py-3">
                 <PrioridadeBadge prioridade={s.prioridade} />
@@ -152,19 +153,23 @@ function Board({ servicos }: { servicos: ServicoLinha[] }) {
             </div>
             <div className="space-y-2">
               {coluna.map((s) => (
-                <Link
+                <div
                   key={s.id}
-                  href={`/servicos/${s.id}`}
                   className="block rounded-md border border-slate-200 bg-white p-3 text-sm shadow-sm hover:border-slate-300"
                 >
-                  <div className="font-medium">{s.titulo}</div>
+                  <Link href={`/servicos/${s.id}`} className="font-medium hover:underline">
+                    {s.titulo}
+                  </Link>
                   <div className="mt-2 flex items-center justify-between">
                     <PrioridadeBadge prioridade={s.prioridade} />
                     <span className="text-xs text-slate-500">
                       {formatarMoeda(s.valorOrcamento)}
                     </span>
                   </div>
-                </Link>
+                  <div className="mt-2">
+                    <StatusQuickChange id={s.id} status={s.status} />
+                  </div>
+                </div>
               ))}
             </div>
           </div>
