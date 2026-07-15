@@ -57,7 +57,7 @@ export async function melhorarOcorrencia(texto: string): Promise<{
   const limpo = texto.trim();
   if (!limpo) return { texto: null, error: 'Escreva a ocorrência antes de melhorar o texto' };
 
-  const melhorado = await melhorarTextoOcorrencia(limpo.slice(0, 4000));
+  const melhorado = await melhorarTextoOcorrencia(limpo.slice(0, 4000), new Date());
   if (!melhorado) {
     return {
       texto: null,

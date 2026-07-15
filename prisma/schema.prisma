@@ -129,6 +129,9 @@ model Lembrete {
   servico   Servico? @relation(fields: [servicoId], references: [id], onDelete: Cascade)
   mensagem  String
   resolvido Boolean  @default(false)
+  // "Adiar": some das listas de ativos até esta data/hora, então reaparece.
+  // null = nunca adiado. Não afeta o índice parcial (segue 1 ativo por serviço).
+  adiadoAte DateTime?
   createdAt DateTime @default(now())
 
   // Índice parcial (1 lembrete NÃO resolvido por serviço) criado à mão na

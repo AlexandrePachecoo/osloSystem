@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { CopyButton } from '@/components/copy-button';
@@ -7,6 +8,55 @@ import { STATUS_LABEL, STATUS_ORDEM, formatarData } from '@/lib/format';
 import type { RelatorioDados } from '@/domain/relatorio';
 
 export const dynamic = 'force-dynamic';
+
+// Renderiza o subconjunto de markdown que a IA produz (parágrafos, listas com
+// "- " e **negrito**) sem depender de biblioteca externa.
+function negrito(texto: string, chave: string): ReactNode[] {
+  return texto.split(/(\*\*[^*]+\*\*)/g).map((parte, i) =>
+    parte.startsWith('**') && parte.endsWith('**') ? (
+      <strong key={`${chave}-${i}`}>{parte.slice(2, -2)}</strong>
+    ) : (
+      <span key={`${chave}-${i}`}>{parte}</span>
+    ),
+  );
+}
+
+function ResumoIA({ texto }: { texto: string }) {
+  const linhas = texto.split('\n');
+  const blocos: ReactNode[] = [];
+  let itens: string[] = [];
+
+  const descarregarLista = () => {
+    if (itens.length === 0) return;
+    const atual = itens;
+    blocos.push(
+      <ul key={`ul-${blocos.length}`} className="ml-4 list-disc space-y-1">
+        {atual.map((item, i) => (
+          <li key={i}>{negrito(item, `li-${blocos.length}-${i}`)}</li>
+        ))}
+      </ul>,
+    );
+    itens = [];
+  };
+
+  for (const linha of linhas) {
+    const semEspaco = linha.trim();
+    const itemLista = semEspaco.match(/^[-*]\s+(.*)$/);
+    if (itemLista) {
+      itens.push(itemLista[1]);
+    } else if (semEspaco === '') {
+      descarregarLista();
+    } else {
+      descarregarLista();
+      blocos.push(
+        <p key={`p-${blocos.length}`}>{negrito(semEspaco, `p-${blocos.length}`)}</p>,
+      );
+    }
+  }
+  descarregarLista();
+
+  return <div className="space-y-2 text-sm leading-relaxed text-slate-700">{blocos}</div>;
+}
 
 export default async function RelatorioDetalhePage({
   params,
@@ -37,6 +87,16 @@ export default async function RelatorioDetalhePage({
           Gerado em {formatarData(relatorio.createdAt)}
         </p>
       </div>
+
+      {dados.resumoIA && (
+        <section className="space-y-2 rounded-lg border border-blue-200 bg-blue-50 p-4">
+          <div className="flex items-center gap-2">
+            <span aria-hidden>✦</span>
+            <h2 className="text-lg font-medium text-blue-900">Resumo e insights (IA)</h2>
+          </div>
+          <ResumoIA texto={dados.resumoIA} />
+        </section>
+      )}
 
       <section className="grid grid-cols-2 gap-3 sm:grid-cols-5">
         {STATUS_ORDEM.map((status) => (

@@ -18,7 +18,8 @@ export default async function ServicosPage({
   const params = await searchParams;
   const statusParse = servicoStatusSchema.safeParse(params.status);
   const filtro: ServicoStatus | undefined = statusParse.success ? statusParse.data : undefined;
-  const board = params.view === 'board';
+  // Board é a visão padrão; a tabela só aparece com ?view=tabela.
+  const board = params.view !== 'tabela';
 
   const servicos = await prisma.servico.findMany({
     where: filtro ? { status: filtro } : undefined,
@@ -29,7 +30,7 @@ export default async function ServicosPage({
   const linkFiltro = (status?: ServicoStatus) =>
     `/servicos?${new URLSearchParams({
       ...(status ? { status } : {}),
-      ...(board ? { view: 'board' } : {}),
+      ...(board ? {} : { view: 'tabela' }),
     })}`;
 
   return (
@@ -54,13 +55,13 @@ export default async function ServicosPage({
         <nav className="flex gap-1 rounded-lg border border-slate-200 bg-white p-1 text-sm">
           <FiltroTab
             href={`/servicos${filtro ? `?status=${filtro}` : ''}`}
-            ativo={!board}
-            label="Tabela"
-          />
-          <FiltroTab
-            href={`/servicos?${new URLSearchParams({ ...(filtro ? { status: filtro } : {}), view: 'board' })}`}
             ativo={board}
             label="Board"
+          />
+          <FiltroTab
+            href={`/servicos?${new URLSearchParams({ ...(filtro ? { status: filtro } : {}), view: 'tabela' })}`}
+            ativo={!board}
+            label="Tabela"
           />
         </nav>
       </div>

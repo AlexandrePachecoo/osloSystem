@@ -5,6 +5,7 @@ import {
   type RelatorioDados,
 } from '@/domain/relatorio';
 import { STATUS_TERMINAIS } from '@/domain/servico-status';
+import { gerarResumoRelatorioIA } from '@/lib/openai';
 import type { ServicoStatus } from '@/generated/prisma/enums';
 
 // Gera (ou regenera) o relatório da semana corrente. Usada pelo cron semanal
@@ -25,7 +26,11 @@ export async function gerarRelatorioSemanal(agora: Date = new Date()) {
       orderBy: [{ prioridade: 'desc' }, { updatedAt: 'asc' }],
     }),
     prisma.lembrete.findMany({
-      where: { resolvido: false },
+      // Adiados (adiadoAte no futuro) não entram como ativos no relatório.
+      where: {
+        resolvido: false,
+        OR: [{ adiadoAte: null }, { adiadoAte: { lte: agora } }],
+      },
       include: { servico: { select: { titulo: true } } },
       orderBy: { createdAt: 'asc' },
     }),
@@ -68,6 +73,11 @@ export async function gerarRelatorioSemanal(agora: Date = new Date()) {
   };
 
   const resumo = montarResumoMarkdown(dados, periodo);
+
+  // Resumo executivo + insights por IA a partir do relatório determinístico.
+  // Falha da IA não bloqueia a geração: resumoIA fica null e a página esconde
+  // o bloco. Guardado dentro de `dados` (Json) — sem migração de coluna.
+  dados.resumoIA = await gerarResumoRelatorioIA(resumo);
 
   return prisma.relatorio.upsert({
     where: {
