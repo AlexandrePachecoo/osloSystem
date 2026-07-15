@@ -163,6 +163,61 @@ model Relatorio {
   @@unique([periodoInicio, periodoFim])
 }
 
+// --- Portaria (Fase 8) ---
+// Diário da portaria preenchido pelo funcionário: ocorrências + encomendas.
+// "Enviar para administração" fecha um RelatorioPortaria com o snapshot do
+// momento; encomendas ainda não entregues NÃO são fechadas — seguem aparecendo
+// nos próximos relatórios até a baixa.
+
+enum EncomendaTipo {
+  interna // morador retira / entrega no apto
+  externa // alguém de fora retira — exige o nome de quem vai retirar
+}
+
+model OcorrenciaPortaria {
+  id          String             @id @default(cuid())
+  colaborador String // quem registrou (nome livre, sugerido dos funcionários ativos)
+  texto       String
+  // null = ainda não enviada — entra no relatório atual
+  relatorioId String?
+  relatorio   RelatorioPortaria? @relation(fields: [relatorioId], references: [id], onDelete: SetNull)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([relatorioId])
+}
+
+model EncomendaPortaria {
+  id          String             @id @default(cuid())
+  apto        String
+  descricao   String
+  tipo        EncomendaTipo      @default(interna)
+  // Preenchido quando tipo = externa: nome de quem vai retirar
+  retiradaPor String?
+  colaborador String // quem registrou
+  entregue    Boolean            @default(false)
+  entregueEm  DateTime?
+  // Relatório em que a ENTREGA foi reportada (só entregues são fechadas;
+  // pendentes ficam sem relatório e reaparecem no próximo)
+  relatorioId String?
+  relatorio   RelatorioPortaria? @relation(fields: [relatorioId], references: [id], onDelete: SetNull)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([entregue])
+  @@index([relatorioId])
+}
+
+model RelatorioPortaria {
+  id          String               @id @default(cuid())
+  colaborador String // quem enviou
+  dados       Json // snapshot: ocorrências + encomendas (entregues e pendentes) no envio
+  resumo      String // texto pronto para leitura/registro
+  enviadoEm   DateTime             @default(now())
+  ocorrencias OcorrenciaPortaria[]
+  encomendas  EncomendaPortaria[]
+}
+
 model MensagemWhatsApp {
   id               String         @id @default(cuid())
   textoOriginal    String

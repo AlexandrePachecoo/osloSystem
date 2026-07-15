@@ -1,5 +1,6 @@
 'use server';
 
+import { exigirAdmin } from '@/lib/session-server';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { processarMensagemRecebida } from '@/lib/whatsapp/pipeline';
@@ -26,6 +27,7 @@ export async function simularMensagemRecebida(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await exigirAdmin();
   const parsed = mensagemIngestSchema.safeParse({
     autor: formData.get('autor'),
     texto: formData.get('texto'),
@@ -48,6 +50,7 @@ export async function atualizarRascunho(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await exigirAdmin();
   const parsed = atualizarRascunhoSchema.safeParse({
     id: formData.get('id'),
     prioridade: formData.get('prioridade') || null,
@@ -141,6 +144,7 @@ export async function aprovarRascunho(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await exigirAdmin();
   return mudarStatusRascunho(formData, 'aprovado');
 }
 
@@ -148,6 +152,7 @@ export async function marcarComoEnviada(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await exigirAdmin();
   return mudarStatusRascunho(formData, 'enviado');
 }
 
@@ -155,5 +160,6 @@ export async function descartarRascunho(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await exigirAdmin();
   return mudarStatusRascunho(formData, 'descartado');
 }
