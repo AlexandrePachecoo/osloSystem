@@ -31,6 +31,56 @@ Quando houver "Situação atual do condomínio" abaixo, use essas informações 
 
 O rascunho será revisado e editado por um humano antes de qualquer envio.`;
 
+// Reescrita de ocorrência da portaria. Mesma política de falha: retorna null
+// em qualquer problema (sem key, timeout, HTTP != 200) — o texto original do
+// porteiro segue valendo e o registro nunca é bloqueado pela OpenAI.
+const MELHORAR_OCORRENCIA_PROMPT = `Você revisa registros do livro de ocorrências da portaria de um condomínio residencial no Brasil. Reescreva o texto do colaborador em português do Brasil: claro, objetivo e profissional, em terceira pessoa, adequado a um registro formal.
+
+Regras:
+- Mantenha TODOS os fatos: nomes, apartamentos, horários, datas, placas, valores.
+- Não invente informações, causas ou conclusões que não estejam no texto.
+- Não use markdown, listas ou títulos — apenas o parágrafo (ou parágrafos) do registro.
+- Responda somente com o texto reescrito, sem comentários.`;
+
+export async function melhorarTextoOcorrencia(texto: string): Promise<string | null> {
+  if (!env.OPENAI_API_KEY) {
+    console.warn('[openai] OPENAI_API_KEY ausente — melhoria de texto indisponível');
+    return null;
+  }
+
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: env.OPENAI_MODEL,
+        messages: [
+          { role: 'system', content: MELHORAR_OCORRENCIA_PROMPT },
+          { role: 'user', content: texto },
+        ],
+      }),
+      signal: AbortSignal.timeout(20_000),
+    });
+
+    if (!res.ok) {
+      console.error(`[openai] HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+      return null;
+    }
+
+    const corpo = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const melhorado = corpo.choices?.[0]?.message?.content?.trim();
+    return melhorado || null;
+  } catch (error) {
+    console.error('[openai] falha na melhoria de texto:', error);
+    return null;
+  }
+}
+
 export async function classificarMensagem(
   autor: string,
   texto: string,

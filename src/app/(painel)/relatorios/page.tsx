@@ -15,11 +15,18 @@ function formatarPeriodo(inicio: Date, fim: Date): string {
 }
 
 export default async function RelatoriosPage() {
-  const relatorios = await prisma.relatorio.findMany({
-    orderBy: { periodoInicio: 'desc' },
-    take: 52,
-    select: { id: true, periodoInicio: true, periodoFim: true, createdAt: true },
-  });
+  const [relatorios, relatoriosPortaria] = await Promise.all([
+    prisma.relatorio.findMany({
+      orderBy: { periodoInicio: 'desc' },
+      take: 52,
+      select: { id: true, periodoInicio: true, periodoFim: true, createdAt: true },
+    }),
+    prisma.relatorioPortaria.findMany({
+      orderBy: { enviadoEm: 'desc' },
+      take: 52,
+      select: { id: true, colaborador: true, enviadoEm: true },
+    }),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -64,6 +71,51 @@ export default async function RelatoriosPage() {
           </table>
         </div>
       )}
+
+      <section className="space-y-3">
+        <h2 className="text-xl font-semibold">Relatórios da portaria</h2>
+        {relatoriosPortaria.length === 0 ? (
+          <p className="text-sm text-slate-500">
+            Nenhum relatório da portaria ainda. O funcionário envia pelo botão &ldquo;Enviar
+            relatório&rdquo; na aba Portaria.
+          </p>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
+            <table className="w-full text-sm">
+              <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Enviado em</th>
+                  <th className="px-4 py-3">Colaborador</th>
+                  <th className="px-4 py-3 text-right">PDF</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {relatoriosPortaria.map((r) => (
+                  <tr key={r.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/relatorios/portaria/${r.id}`}
+                        className="font-medium hover:underline"
+                      >
+                        {formatarData(r.enviadoEm)}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-slate-500">{r.colaborador}</td>
+                    <td className="px-4 py-3 text-right">
+                      <a
+                        href={`/api/portaria/relatorio/pdf?id=${r.id}`}
+                        className="text-blue-700 hover:underline"
+                      >
+                        Baixar PDF
+                      </a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

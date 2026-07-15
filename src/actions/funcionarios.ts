@@ -1,5 +1,6 @@
 'use server';
 
+import { exigirAdmin } from '@/lib/session-server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
@@ -11,6 +12,7 @@ export async function criarFuncionario(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await exigirAdmin();
   const parsed = funcionarioCreateSchema.safeParse({
     nome: formData.get('nome'),
     funcao: formData.get('funcao'),
@@ -29,6 +31,7 @@ export async function atualizarFuncionario(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await exigirAdmin();
   const parsed = funcionarioUpdateSchema.safeParse({
     id: formData.get('id'),
     nome: formData.get('nome'),
@@ -46,6 +49,7 @@ export async function atualizarFuncionario(
 }
 
 export async function excluirFuncionario(formData: FormData): Promise<void> {
+  await exigirAdmin();
   const id = z.cuid().parse(formData.get('id'));
   await prisma.funcionario.delete({ where: { id } });
   revalidatePath('/funcionarios');

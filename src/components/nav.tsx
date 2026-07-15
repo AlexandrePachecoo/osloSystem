@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { logout } from '@/actions/auth';
+import type { Papel } from '@/lib/session';
 
-const LINKS = [
+const LINKS_ADMIN = [
   { href: '/', label: 'Painel' },
   { href: '/servicos', label: 'Serviços' },
   { href: '/lembretes', label: 'Lembretes' },
@@ -10,18 +11,25 @@ const LINKS = [
   { href: '/funcionarios', label: 'Funcionários' },
   { href: '/empresas', label: 'Empresas' },
   { href: '/whatsapp', label: 'WhatsApp' },
+  { href: '/portaria', label: 'Portaria' },
 ];
 
-export function Nav() {
+// Funcionário (portaria) só vê a própria aba.
+const LINKS_FUNCIONARIO = [{ href: '/portaria', label: 'Relatório da portaria' }];
+
+export function Nav({ papel }: { papel: Papel }) {
+  const links = papel === 'admin' ? LINKS_ADMIN : LINKS_FUNCIONARIO;
+  const home = papel === 'admin' ? '/' : '/portaria';
+
   return (
     <header className="border-b border-slate-200 bg-white">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
         <div className="flex items-center gap-6">
-          <Link href="/" className="text-lg font-semibold tracking-tight">
+          <Link href={home} className="text-lg font-semibold tracking-tight">
             Oslo<span className="text-slate-400">/condomínio</span>
           </Link>
           <nav className="flex gap-4 text-sm">
-            {LINKS.map((l) => (
+            {links.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}

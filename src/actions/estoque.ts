@@ -1,5 +1,6 @@
 'use server';
 
+import { exigirAdmin } from '@/lib/session-server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
@@ -11,6 +12,7 @@ export async function criarItemEstoque(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await exigirAdmin();
   const parsed = itemEstoqueCreateSchema.safeParse({
     nome: formData.get('nome'),
     quantidade: formData.get('quantidade'),
@@ -29,6 +31,7 @@ export async function atualizarItemEstoque(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await exigirAdmin();
   const parsed = itemEstoqueUpdateSchema.safeParse({
     id: formData.get('id'),
     nome: formData.get('nome'),
@@ -46,6 +49,7 @@ export async function atualizarItemEstoque(
 }
 
 export async function excluirItemEstoque(formData: FormData): Promise<void> {
+  await exigirAdmin();
   const id = z.cuid().parse(formData.get('id'));
   await prisma.itemEstoque.delete({ where: { id } });
   revalidatePath('/estoque');
@@ -64,6 +68,7 @@ export async function movimentarEstoque(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await exigirAdmin();
   const parsed = movimentarSchema.safeParse({
     id: formData.get('id'),
     quantidade: formData.get('quantidade'),

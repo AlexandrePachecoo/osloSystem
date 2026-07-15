@@ -1,5 +1,6 @@
 'use server';
 
+import { exigirAdmin } from '@/lib/session-server';
 import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
@@ -21,6 +22,7 @@ export type ChatResultado = { resposta: string; erro: null } | { resposta: null;
 export async function enviarMensagemAssistente(
   historico: ChatTurno[],
 ): Promise<ChatResultado> {
+  await exigirAdmin();
   const parsed = historicoSchema.safeParse(historico);
   if (!parsed.success) {
     return { resposta: null, erro: 'Mensagem inválida' };
@@ -50,6 +52,7 @@ export async function criarNotaContexto(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await exigirAdmin();
   const parsed = notaSchema.safeParse({ texto: formData.get('texto') });
   if (!parsed.success) {
     return { error: parsed.error.issues[0].message };
@@ -60,6 +63,7 @@ export async function criarNotaContexto(
 }
 
 export async function desativarNotaContexto(formData: FormData): Promise<void> {
+  await exigirAdmin();
   const id = z.cuid().parse(formData.get('id'));
   await prisma.notaContexto.update({ where: { id }, data: { ativo: false } });
   revalidatePath('/');

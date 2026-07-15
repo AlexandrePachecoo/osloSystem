@@ -1,5 +1,6 @@
 'use server';
 
+import { exigirAdmin } from '@/lib/session-server';
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@/lib/prisma';
 import { orcamentoCreateSchema, orcamentoIdSchema } from '@/schemas/orcamento';
@@ -10,6 +11,7 @@ export async function adicionarOrcamento(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await exigirAdmin();
   const parsed = orcamentoCreateSchema.safeParse({
     servicoId: formData.get('servicoId'),
     fornecedor: formData.get('fornecedor'),
@@ -27,6 +29,7 @@ export async function adicionarOrcamento(
 }
 
 export async function removerOrcamento(formData: FormData): Promise<void> {
+  await exigirAdmin();
   const parsed = orcamentoIdSchema.safeParse({
     id: formData.get('id'),
     servicoId: formData.get('servicoId'),
@@ -40,6 +43,7 @@ export async function removerOrcamento(formData: FormData): Promise<void> {
 // Marca um orçamento como escolhido e desmarca os demais do mesmo serviço.
 // Clicar de novo no já selecionado desfaz a escolha.
 export async function selecionarOrcamento(formData: FormData): Promise<void> {
+  await exigirAdmin();
   const parsed = orcamentoIdSchema.safeParse({
     id: formData.get('id'),
     servicoId: formData.get('servicoId'),
