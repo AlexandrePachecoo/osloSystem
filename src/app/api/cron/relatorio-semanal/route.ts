@@ -3,6 +3,8 @@ import { isCronAuthorized } from '@/lib/cron-auth';
 import { gerarRelatorioSemanal } from '@/lib/gerar-relatorio';
 
 export const dynamic = 'force-dynamic';
+// A geração inclui uma chamada à IA (resumo + insights) — dá folga ao timeout.
+export const maxDuration = 60;
 
 // Cron semanal (domingo 20h BRT): gera/atualiza o relatório da semana corrente.
 // Também serve como endpoint de geração sob demanda via

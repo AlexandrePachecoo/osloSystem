@@ -50,6 +50,10 @@ export type RelatorioDados = {
     para: ServicoStatus;
     em: string;
   }[];
+  // Resumo executivo + insights gerados por IA a partir dos dados acima.
+  // Opcional: null/ausente quando a IA está indisponível (ou em relatórios
+  // antigos, gerados antes deste recurso).
+  resumoIA?: string | null;
 };
 
 function dataCurtaBRT(iso: string): string {
