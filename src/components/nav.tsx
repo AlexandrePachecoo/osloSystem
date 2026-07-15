@@ -11,7 +11,6 @@ const LINKS_ADMIN = [
   { href: '/funcionarios', label: 'Funcionários' },
   { href: '/empresas', label: 'Empresas' },
   { href: '/whatsapp', label: 'WhatsApp' },
-  { href: '/portaria', label: 'Portaria' },
 ];
 
 // Funcionário (portaria) só vê a própria aba.

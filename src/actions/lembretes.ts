@@ -14,6 +14,36 @@ export async function resolverLembrete(formData: FormData): Promise<void> {
   revalidatePath('/');
 }
 
+const DIA_MS = 24 * 60 * 60 * 1000;
+const ADIAR_DIAS_PADRAO = 3;
+
+// "Adiar": tira o lembrete das listas de ativos por alguns dias (padrão 3);
+// ele reaparece automaticamente quando a data passa. Não resolve nem apaga.
+export async function adiarLembrete(formData: FormData): Promise<void> {
+  await exigirAdmin();
+  const id = z.cuid().parse(formData.get('id'));
+  const dias = z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(365)
+    .catch(ADIAR_DIAS_PADRAO)
+    .parse(formData.get('dias') ?? ADIAR_DIAS_PADRAO);
+  const adiadoAte = new Date(Date.now() + dias * DIA_MS);
+  await prisma.lembrete.update({ where: { id }, data: { adiadoAte } });
+  revalidatePath('/lembretes');
+  revalidatePath('/');
+}
+
+// Traz de volta um lembrete adiado antes do prazo (limpa adiadoAte).
+export async function retomarLembrete(formData: FormData): Promise<void> {
+  await exigirAdmin();
+  const id = z.cuid().parse(formData.get('id'));
+  await prisma.lembrete.update({ where: { id }, data: { adiadoAte: null } });
+  revalidatePath('/lembretes');
+  revalidatePath('/');
+}
+
 const criarLembreteSchema = z.object({
   mensagem: z.string().trim().min(1, 'Escreva a mensagem do lembrete').max(1000),
   servicoId: z

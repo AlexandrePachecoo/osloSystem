@@ -6,6 +6,7 @@ import { AssistenteChat } from '@/components/assistente-chat';
 import { EstoqueRapido } from '@/components/estoque-rapido';
 import { NotaContextoForm } from '@/components/nota-contexto-form';
 import { desativarNotaContexto } from '@/actions/assistente';
+import { adiarLembrete, resolverLembrete } from '@/actions/lembretes';
 import type { ServicoStatus } from '@/generated/prisma/enums';
 
 export const dynamic = 'force-dynamic';
@@ -16,7 +17,11 @@ export default async function DashboardPage() {
   const [porStatus, lembretes, itensEstoque, notas] = await Promise.all([
     prisma.servico.groupBy({ by: ['status'], _count: { _all: true } }),
     prisma.lembrete.findMany({
-      where: { resolvido: false },
+      // Adiados (adiadoAte no futuro) somem até o prazo passar.
+      where: {
+        resolvido: false,
+        OR: [{ adiadoAte: null }, { adiadoAte: { lte: new Date() } }],
+      },
       orderBy: { createdAt: 'desc' },
       take: 5,
       include: { servico: { select: { id: true, titulo: true } } },
@@ -130,16 +135,38 @@ export default async function DashboardPage() {
             {lembretes.map((l) => (
               <li
                 key={l.id}
-                className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm"
+                className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm"
               >
-                {l.servico ? (
-                  <Link href={`/servicos/${l.servico.id}`} className="hover:underline">
-                    {l.mensagem}
-                  </Link>
-                ) : (
-                  <span>{l.mensagem}</span>
-                )}
-                <span className="ml-2 text-xs text-slate-500">{formatarData(l.createdAt)}</span>
+                <div className="min-w-0">
+                  {l.servico ? (
+                    <Link href={`/servicos/${l.servico.id}`} className="hover:underline">
+                      {l.mensagem}
+                    </Link>
+                  ) : (
+                    <span>{l.mensagem}</span>
+                  )}
+                  <span className="ml-2 text-xs text-slate-500">{formatarData(l.createdAt)}</span>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <form action={adiarLembrete}>
+                    <input type="hidden" name="id" value={l.id} />
+                    <button
+                      type="submit"
+                      className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium hover:bg-slate-50"
+                    >
+                      Adiar
+                    </button>
+                  </form>
+                  <form action={resolverLembrete}>
+                    <input type="hidden" name="id" value={l.id} />
+                    <button
+                      type="submit"
+                      className="rounded-md bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700"
+                    >
+                      Feito
+                    </button>
+                  </form>
+                </div>
               </li>
             ))}
           </ul>

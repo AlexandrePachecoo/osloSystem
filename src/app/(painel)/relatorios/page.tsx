@@ -4,6 +4,8 @@ import { gerarRelatorioAgora } from '@/actions/relatorios';
 import { formatarData } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
+// A geração sob demanda inclui uma chamada à IA (resumo + insights).
+export const maxDuration = 60;
 
 function formatarPeriodo(inicio: Date, fim: Date): string {
   const fmt = new Intl.DateTimeFormat('pt-BR', {
@@ -30,8 +32,8 @@ export default async function RelatoriosPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Relatórios semanais</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold">Relatórios</h1>
         <form action={gerarRelatorioAgora}>
           <button
             type="submit"
@@ -42,80 +44,90 @@ export default async function RelatoriosPage() {
         </form>
       </div>
 
-      {relatorios.length === 0 ? (
-        <p className="text-sm text-slate-500">
-          Nenhum relatório ainda. O cron gera um todo domingo às 20h, ou clique em
-          &ldquo;Gerar relatório da semana&rdquo;.
-        </p>
-      ) : (
-        <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-          <table className="w-full text-sm">
-            <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-4 py-3">Período</th>
-                <th className="px-4 py-3">Gerado em</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {relatorios.map((r) => (
-                <tr key={r.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3">
-                    <Link href={`/relatorios/${r.id}`} className="font-medium hover:underline">
-                      {formatarPeriodo(r.periodoInicio, r.periodoFim)}
-                    </Link>
-                  </td>
-                  <td className="px-4 py-3 text-slate-500">{formatarData(r.createdAt)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <section className="space-y-3">
-        <h2 className="text-xl font-semibold">Relatórios da portaria</h2>
-        {relatoriosPortaria.length === 0 ? (
-          <p className="text-sm text-slate-500">
-            Nenhum relatório da portaria ainda. O funcionário envia pelo botão &ldquo;Enviar
-            relatório&rdquo; na aba Portaria.
-          </p>
-        ) : (
-          <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white">
-            <table className="w-full text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-4 py-3">Enviado em</th>
-                  <th className="px-4 py-3">Colaborador</th>
-                  <th className="px-4 py-3 text-right">PDF</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {relatoriosPortaria.map((r) => (
-                  <tr key={r.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3">
-                      <Link
-                        href={`/relatorios/portaria/${r.id}`}
-                        className="font-medium hover:underline"
-                      >
-                        {formatarData(r.enviadoEm)}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-slate-500">{r.colaborador}</td>
-                    <td className="px-4 py-3 text-right">
-                      <a
-                        href={`/api/portaria/relatorio/pdf?id=${r.id}`}
-                        className="text-blue-700 hover:underline"
-                      >
-                        Baixar PDF
-                      </a>
-                    </td>
+      {/* Semanais e da portaria lado a lado — cada coluna rola sozinha quando
+          houver muitos registros. */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">Relatórios semanais</h2>
+          {relatorios.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              Nenhum relatório ainda. O cron gera um todo domingo às 20h, ou clique em
+              &ldquo;Gerar relatório da semana&rdquo;.
+            </p>
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+              <table className="w-full text-sm">
+                <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">Período</th>
+                    <th className="px-4 py-3">Gerado em</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {relatorios.map((r) => (
+                    <tr key={r.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3">
+                        <Link
+                          href={`/relatorios/${r.id}`}
+                          className="font-medium hover:underline"
+                        >
+                          {formatarPeriodo(r.periodoInicio, r.periodoFim)}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-slate-500">{formatarData(r.createdAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
+        <section className="space-y-3">
+          <h2 className="text-lg font-semibold">Relatórios da portaria</h2>
+          {relatoriosPortaria.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              Nenhum relatório da portaria ainda. O funcionário envia pelo botão &ldquo;Enviar
+              relatório&rdquo; na aba Portaria.
+            </p>
+          ) : (
+            <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+              <table className="w-full text-sm">
+                <thead className="border-b border-slate-200 bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                  <tr>
+                    <th className="px-4 py-3">Enviado em</th>
+                    <th className="px-4 py-3">Colaborador</th>
+                    <th className="px-4 py-3 text-right">PDF</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {relatoriosPortaria.map((r) => (
+                    <tr key={r.id} className="hover:bg-slate-50">
+                      <td className="px-4 py-3">
+                        <Link
+                          href={`/relatorios/portaria/${r.id}`}
+                          className="font-medium hover:underline"
+                        >
+                          {formatarData(r.enviadoEm)}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-slate-500">{r.colaborador}</td>
+                      <td className="px-4 py-3 text-right">
+                        <a
+                          href={`/api/portaria/relatorio/pdf?id=${r.id}`}
+                          className="text-blue-700 hover:underline"
+                        >
+                          Baixar PDF
+                        </a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

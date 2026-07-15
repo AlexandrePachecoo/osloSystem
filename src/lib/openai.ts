@@ -39,10 +39,22 @@ const MELHORAR_OCORRENCIA_PROMPT = `Você revisa registros do livro de ocorrênc
 Regras:
 - Mantenha TODOS os fatos: nomes, apartamentos, horários, datas, placas, valores.
 - Não invente informações, causas ou conclusões que não estejam no texto.
+- Datas e horários: se o texto do colaborador JÁ trouxer uma data ou horário, mantenha exatamente o que ele escreveu. Se NÃO houver data nem horário no texto, use a "Data e hora atuais" informada abaixo como o momento do registro — nunca invente outra data.
 - Não use markdown, listas ou títulos — apenas o parágrafo (ou parágrafos) do registro.
 - Responda somente com o texto reescrito, sem comentários.`;
 
-export async function melhorarTextoOcorrencia(texto: string): Promise<string | null> {
+function dataHoraAtualBRT(agora: Date): string {
+  return new Intl.DateTimeFormat('pt-BR', {
+    dateStyle: 'full',
+    timeStyle: 'short',
+    timeZone: 'America/Sao_Paulo',
+  }).format(agora);
+}
+
+export async function melhorarTextoOcorrencia(
+  texto: string,
+  agora: Date = new Date(),
+): Promise<string | null> {
   if (!env.OPENAI_API_KEY) {
     console.warn('[openai] OPENAI_API_KEY ausente — melhoria de texto indisponível');
     return null;
@@ -58,7 +70,10 @@ export async function melhorarTextoOcorrencia(texto: string): Promise<string | n
       body: JSON.stringify({
         model: env.OPENAI_MODEL,
         messages: [
-          { role: 'system', content: MELHORAR_OCORRENCIA_PROMPT },
+          {
+            role: 'system',
+            content: `${MELHORAR_OCORRENCIA_PROMPT}\n\nData e hora atuais (use só se o texto não trouxer data/horário): ${dataHoraAtualBRT(agora)}.`,
+          },
           { role: 'user', content: texto },
         ],
       }),
@@ -151,6 +166,61 @@ export async function classificarMensagem(
     return parsed.data;
   } catch (error) {
     console.error('[openai] falha na classificação:', error);
+    return null;
+  }
+}
+
+// Resumo executivo do relatório semanal via IA. Recebe o relatório já montado
+// (markdown determinístico) e devolve um resumo curto com insights. Mesma
+// política de falha das demais: retorna null em qualquer problema — o relatório
+// determinístico continua valendo e a página só esconde o bloco de IA.
+const RESUMO_RELATORIO_PROMPT = `Você é o assistente da administração de um condomínio residencial pequeno no Brasil. Recebe o relatório semanal já consolidado (serviços por status, prioridades pendentes, lembretes ativos, estoque abaixo do mínimo e movimentações da semana) e produz um resumo executivo para o síndico.
+
+Escreva em português do Brasil, em markdown, com esta estrutura:
+- Um parágrafo curto (2 a 4 frases) resumindo como está a semana no geral.
+- Em seguida, uma lista "**Insights e alertas:**" com 2 a 5 itens objetivos. Destaque padrões que exigem atenção: serviços de alta/urgente parados, lembretes ou problemas que já se arrastam há tempo (ex.: um vazamento em aberto há semanas), estoque crítico e gargalos. Se algo estiver bem, pode registrar em no máximo 1 item.
+
+Regras:
+- Use SOMENTE os dados do relatório. Não invente números, prazos, nomes ou causas.
+- Seja direto e útil para decisão. Sem saudações, sem títulos de nível 1, sem "aqui está o resumo".`;
+
+export async function gerarResumoRelatorioIA(
+  relatorioMarkdown: string,
+): Promise<string | null> {
+  if (!env.OPENAI_API_KEY) {
+    console.warn('[openai] OPENAI_API_KEY ausente — resumo do relatório indisponível');
+    return null;
+  }
+
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${env.OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: env.OPENAI_MODEL,
+        messages: [
+          { role: 'system', content: RESUMO_RELATORIO_PROMPT },
+          { role: 'user', content: relatorioMarkdown },
+        ],
+      }),
+      signal: AbortSignal.timeout(30_000),
+    });
+
+    if (!res.ok) {
+      console.error(`[openai] HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+      return null;
+    }
+
+    const corpo = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const resumo = corpo.choices?.[0]?.message?.content?.trim();
+    return resumo || null;
+  } catch (error) {
+    console.error('[openai] falha no resumo do relatório:', error);
     return null;
   }
 }
