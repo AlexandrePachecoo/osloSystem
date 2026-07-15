@@ -130,6 +130,30 @@ src/
   (respostas a DMs recebidas caem sempre nessa janela). Só mensagens de **texto**
   são ingeridas por ora (mídia/status são ignorados).
 
+## Fase 8 — implementada
+
+- **Dois papéis de login**: `ADMIN_PASSWORD` → admin (acesso a tudo) e
+  `FUNCIONARIO_PASSWORD` (opcional) → funcionário, que só acessa a aba
+  **Portaria** (`/portaria`) — o proxy redireciona qualquer outra rota e todas
+  as Server Actions administrativas revalidam o papel internamente
+  (`src/lib/session-server.ts`). O cookie de sessão agora carrega o papel
+  (`<papel>.<hmac>` — sessões antigas são invalidadas, basta logar de novo).
+- **Relatório da portaria** (`/portaria`): campo de nome do colaborador
+  (sugestão vem dos funcionários ativos), registro de **ocorrências** com botão
+  "Melhorar texto com IA" (OpenAI; sem key, o texto original segue valendo) e
+  registro de **encomendas** (apto, descrição, retirada interna/externa — se
+  externa, o nome de quem vai retirar) com botão **"Entrega feita"** para dar
+  baixa.
+- **Carry-over de encomendas**: encomendas sem baixa ficam com
+  `relatorioId = null` e reaparecem em todos os relatórios seguintes até serem
+  entregues; só ocorrências e entregas baixadas são "fechadas" no envio.
+- **Enviar para a administração**: fecha o relatório aberto em um
+  `RelatorioPortaria` (snapshot JSON + resumo em texto). O admin vê a lista em
+  `/relatorios` (seção "Relatórios da portaria") e o detalhe em
+  `/relatorios/portaria/[id]`.
+- **PDF** (`GET /api/portaria/relatorio/pdf[?id=...]`): baixa o relatório atual
+  ou um já enviado, gerado com `pdf-lib` (JS puro, funciona em serverless).
+
 ## Rodando local
 
 1. Dependências: `npm install` (o `postinstall` gera o Prisma Client).
@@ -138,7 +162,8 @@ src/
    DATABASE_URL="postgresql://postgres@localhost:5432/oslo"
    DIRECT_URL="postgresql://postgres@localhost:5432/oslo"
    ```
-   Gere segredos: `openssl rand -hex 32` para `CRON_SECRET` e `AUTH_SECRET`; defina `ADMIN_PASSWORD` (mín. 8 chars).
+   Gere segredos: `openssl rand -hex 32` para `CRON_SECRET` e `AUTH_SECRET`; defina `ADMIN_PASSWORD`
+   (mín. 8 chars) e, se quiser o login da portaria, `FUNCIONARIO_PASSWORD` (mín. 8 chars).
 3. Migrations: `npx prisma migrate deploy` (ou `npx prisma migrate dev` para desenvolver schema).
 4. `npm run dev` → http://localhost:3000 (login com `ADMIN_PASSWORD`).
 5. Testar o cron manualmente:

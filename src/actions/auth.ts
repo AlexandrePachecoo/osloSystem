@@ -8,22 +8,33 @@ import {
   SESSION_COOKIE,
   SESSION_MAX_AGE_SECONDS,
   createSessionToken,
+  type Papel,
 } from '@/lib/session';
 import type { ActionState } from '@/actions/servicos';
 
-function senhaCorreta(senha: string): boolean {
+function senhaConfere(senha: string, esperada: string | undefined): boolean {
+  if (!esperada) return false;
   const a = Buffer.from(senha);
-  const b = Buffer.from(env.ADMIN_PASSWORD);
+  const b = Buffer.from(esperada);
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+// Uma senha por papel: ADMIN_PASSWORD → admin, FUNCIONARIO_PASSWORD → funcionário.
+// A senha do admin é testada primeiro (se coincidirem, prevalece o admin).
+function papelDaSenha(senha: string): Papel | null {
+  if (senhaConfere(senha, env.ADMIN_PASSWORD)) return 'admin';
+  if (senhaConfere(senha, env.FUNCIONARIO_PASSWORD)) return 'funcionario';
+  return null;
 }
 
 export async function login(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const senha = String(formData.get('senha') ?? '');
-  if (!senhaCorreta(senha)) {
+  const papel = papelDaSenha(senha);
+  if (!papel) {
     return { error: 'Senha incorreta' };
   }
 
-  const token = await createSessionToken(env.AUTH_SECRET);
+  const token = await createSessionToken(env.AUTH_SECRET, papel);
   const cookieStore = await cookies();
   cookieStore.set(SESSION_COOKIE, token, {
     httpOnly: true,
@@ -32,7 +43,7 @@ export async function login(_prev: ActionState, formData: FormData): Promise<Act
     path: '/',
     maxAge: SESSION_MAX_AGE_SECONDS,
   });
-  redirect('/');
+  redirect(papel === 'funcionario' ? '/portaria' : '/');
 }
 
 export async function logout(): Promise<void> {

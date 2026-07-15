@@ -1,5 +1,6 @@
 'use server';
 
+import { exigirAdmin } from '@/lib/session-server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
@@ -14,6 +15,7 @@ function primeiroErro(error: unknown): string {
 }
 
 export async function criarServico(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await exigirAdmin();
   const parsed = servicoCreateSchema.safeParse({
     titulo: formData.get('titulo'),
     descricao: formData.get('descricao'),
@@ -42,6 +44,7 @@ export async function criarServico(_prev: ActionState, formData: FormData): Prom
 }
 
 export async function atualizarServico(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  await exigirAdmin();
   const parsed = servicoUpdateSchema.safeParse({
     id: formData.get('id'),
     titulo: formData.get('titulo'),
@@ -69,6 +72,7 @@ export async function mudarStatusServico(
   _prev: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  await exigirAdmin();
   const parsed = mudarStatusSchema.safeParse({
     id: formData.get('id'),
     paraStatus: formData.get('paraStatus'),
@@ -114,6 +118,7 @@ export async function mudarStatusServico(
 }
 
 export async function excluirServico(formData: FormData): Promise<void> {
+  await exigirAdmin();
   const id = String(formData.get('id') ?? '');
   if (!id) return;
   // Só permite excluir serviços encerrados ou ainda em orçamento — os demais

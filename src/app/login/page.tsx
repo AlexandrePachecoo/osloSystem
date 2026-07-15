@@ -16,7 +16,7 @@ export default function LoginPage() {
           Oslo<span className="text-slate-400">/condomínio</span>
         </h1>
         <label className="block text-sm">
-          <span className="mb-1 block text-slate-600">Senha do administrador</span>
+          <span className="mb-1 block text-slate-600">Senha (administração ou portaria)</span>
           <input
             type="password"
             name="senha"
