@@ -23,6 +23,14 @@ export const STATUS_ORDEM: readonly ServicoStatus[] = [
   'rejeitado',
 ];
 
+// Da mais crítica para a menos crítica — usada nos resumos por prioridade.
+export const PRIORIDADE_ORDEM: readonly Prioridade[] = [
+  'urgente',
+  'alta',
+  'media',
+  'baixa',
+];
+
 export function formatarMoeda(valor: unknown): string {
   if (valor === null || valor === undefined) return '—';
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
