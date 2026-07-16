@@ -26,7 +26,7 @@ export function LembreteForm({ servicos }: { servicos: { id: string; titulo: str
       className="space-y-3 rounded-lg border border-slate-200 bg-white p-4"
     >
       <h2 className="text-sm font-semibold text-slate-600">Novo lembrete</h2>
-      <div className="grid gap-3 sm:grid-cols-[1fr_240px]">
+      <div className="grid gap-3 sm:grid-cols-[1fr_200px_200px]">
         <label className="block text-sm">
           <span className="mb-1 block text-xs font-medium text-slate-500">Mensagem *</span>
           <input
@@ -48,6 +48,15 @@ export function LembreteForm({ servicos }: { servicos: { id: string; titulo: str
               </option>
             ))}
           </select>
+        </label>
+        <label className="block text-sm">
+          <span className="mb-1 block text-xs font-medium text-slate-500">
+            Agendar para (opcional)
+          </span>
+          <input type="date" name="agendadoPara" className={inputCls} />
+          <span className="mt-1 block text-xs text-slate-400">
+            Só aparece no painel a partir dessa data.
+          </span>
         </label>
       </div>
       {state.error && <p className="text-sm text-red-600">{state.error}</p>}

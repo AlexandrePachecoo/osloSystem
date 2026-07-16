@@ -17,10 +17,14 @@ export default async function DashboardPage() {
   const [porStatus, lembretes, itensEstoque, notas] = await Promise.all([
     prisma.servico.groupBy({ by: ['status'], _count: { _all: true } }),
     prisma.lembrete.findMany({
-      // Adiados (adiadoAte no futuro) somem até o prazo passar.
+      // Adiados (adiadoAte no futuro) e agendados para o futuro (agendadoPara)
+      // somem até a data chegar.
       where: {
         resolvido: false,
-        OR: [{ adiadoAte: null }, { adiadoAte: { lte: new Date() } }],
+        AND: [
+          { OR: [{ adiadoAte: null }, { adiadoAte: { lte: new Date() } }] },
+          { OR: [{ agendadoPara: null }, { agendadoPara: { lte: new Date() } }] },
+        ],
       },
       orderBy: { createdAt: 'desc' },
       take: 5,
