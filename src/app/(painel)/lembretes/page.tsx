@@ -1,6 +1,11 @@
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
-import { adiarLembrete, resolverLembrete, retomarLembrete } from '@/actions/lembretes';
+import {
+  adiarLembrete,
+  anteciparLembrete,
+  resolverLembrete,
+  retomarLembrete,
+} from '@/actions/lembretes';
 import { formatarData } from '@/lib/format';
 import { StatusBadge } from '@/components/badges';
 import { LembreteForm } from '@/components/lembrete-form';
@@ -26,8 +31,12 @@ export default async function LembretesPage() {
   const naoResolvidos = lembretes.filter((l) => !l.resolvido);
   const estaAdiado = (l: (typeof lembretes)[number]) =>
     l.adiadoAte !== null && l.adiadoAte.getTime() > agora;
-  const ativos = naoResolvidos.filter((l) => !estaAdiado(l));
+  const estaAgendado = (l: (typeof lembretes)[number]) =>
+    l.agendadoPara !== null && l.agendadoPara.getTime() > agora;
+  // Adiar tem precedência sobre agendar na hora de classificar a exibição.
+  const ativos = naoResolvidos.filter((l) => !estaAdiado(l) && !estaAgendado(l));
   const adiados = naoResolvidos.filter(estaAdiado);
+  const agendados = naoResolvidos.filter((l) => !estaAdiado(l) && estaAgendado(l));
   const resolvidos = lembretes.filter((l) => l.resolvido);
 
   return (
@@ -119,6 +128,55 @@ export default async function LembretesPage() {
                     className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-50"
                   >
                     Retomar
+                  </button>
+                </form>
+                <form action={resolverLembrete}>
+                  <input type="hidden" name="id" value={l.id} />
+                  <button
+                    type="submit"
+                    className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700"
+                  >
+                    Feito
+                  </button>
+                </form>
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {agendados.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-lg font-medium text-slate-500">Agendados ({agendados.length})</h2>
+          {agendados.map((l) => (
+            <div
+              key={l.id}
+              className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm"
+            >
+              <div>
+                {l.servico ? (
+                  <Link
+                    href={`/servicos/${l.servico.id}`}
+                    className="font-medium hover:underline"
+                  >
+                    {l.servico.titulo}
+                  </Link>
+                ) : (
+                  <span className="font-medium text-slate-600">Lembrete avulso</span>
+                )}
+                <p className="mt-1 text-slate-600">{l.mensagem}</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Agendado para {formatarData(l.agendadoPara!)}
+                </p>
+              </div>
+              <div className="flex shrink-0 gap-2">
+                <form action={anteciparLembrete}>
+                  <input type="hidden" name="id" value={l.id} />
+                  <button
+                    type="submit"
+                    className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm hover:bg-slate-50"
+                  >
+                    Antecipar
                   </button>
                 </form>
                 <form action={resolverLembrete}>

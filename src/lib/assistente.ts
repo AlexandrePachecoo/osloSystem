@@ -18,6 +18,7 @@ const SYSTEM_PROMPT = `Você é o assistente de gerenciamento da administração
 Regras:
 - Responda sempre em português do Brasil, curto e direto (1 a 4 frases).
 - Quando o administrador relatar um fato que corresponde a uma ação (problema sendo resolvido → criar serviço; aviso/informação para os moradores → salvar contexto; coisa a não esquecer → criar lembrete; material usado/comprado → movimentar estoque), execute a ação em vez de apenas responder.
+- Um lembrete pode ser agendado para uma data futura ("me lembra de cobrar a empresa X dia 20", "semana que vem"): calcule a data absoluta (YYYY-MM-DD) a partir da data atual informada e passe em agendadoPara. Sem data explícita, deixe null (vale desde já).
 - Um problema que JÁ está sendo resolvido entra como serviço "em_andamento"; um problema novo ainda sem solução contratada entra como "orcamento".
 - Avisos e informações gerais (eventos, obras, mudanças de regra) devem ser salvos como contexto: eles alimentam as respostas automáticas do WhatsApp aos moradores.
 - Depois de executar uma ação, confirme em uma frase o que foi feito.
@@ -41,6 +42,11 @@ const listarServicosArgs = z.object({
 
 const criarLembreteArgs = z.object({
   mensagem: z.string().trim().min(1).max(1000),
+  // Data (YYYY-MM-DD) para agendar; null/ausente = vale desde já.
+  agendadoPara: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, 'data inválida (use YYYY-MM-DD)')
+    .nullish(),
 });
 
 const salvarContextoArgs = z.object({
@@ -113,8 +119,13 @@ const TOOL_DEFS = [
         type: 'object',
         properties: {
           mensagem: { type: 'string', description: 'Texto do lembrete.' },
+          agendadoPara: {
+            type: ['string', 'null'],
+            description:
+              'Data (YYYY-MM-DD) para o lembrete só aparecer no painel a partir dela; null para valer desde já. Calcule a data absoluta a partir da data atual informada no sistema (ex.: "sexta que vem", "dia 20").',
+          },
         },
-        required: ['mensagem'],
+        required: ['mensagem', 'agendadoPara'],
         additionalProperties: false,
       },
     },
@@ -223,9 +234,15 @@ async function executarFerramenta(nome: string, argsJson: string): Promise<strin
       }
 
       case 'criar_lembrete': {
-        const { mensagem } = criarLembreteArgs.parse(args);
-        const lembrete = await prisma.lembrete.create({ data: { mensagem } });
-        return JSON.stringify({ ok: true, id: lembrete.id });
+        const { mensagem, agendadoPara } = criarLembreteArgs.parse(args);
+        const lembrete = await prisma.lembrete.create({
+          data: {
+            mensagem,
+            // Início do dia no horário de Brasília (UTC-3), igual ao formulário.
+            agendadoPara: agendadoPara ? new Date(`${agendadoPara}T00:00:00-03:00`) : null,
+          },
+        });
+        return JSON.stringify({ ok: true, id: lembrete.id, agendadoPara: agendadoPara ?? null });
       }
 
       case 'salvar_contexto': {
