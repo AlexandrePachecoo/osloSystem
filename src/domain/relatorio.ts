@@ -1,5 +1,5 @@
 import type { Prioridade, ServicoStatus } from '@/generated/prisma/enums';
-import { STATUS_LABEL, PRIORIDADE_LABEL, STATUS_ORDEM } from '@/lib/format';
+import { STATUS_LABEL, PRIORIDADE_LABEL, STATUS_ORDEM, PRIORIDADE_ORDEM } from '@/lib/format';
 
 // Funções puras do relatório semanal — sem Prisma, sem I/O — para o cálculo
 // de período e a montagem do resumo serem testáveis isoladamente.
@@ -50,6 +50,21 @@ export type RelatorioDados = {
     para: ServicoStatus;
     em: string;
   }[];
+  // Movimento da portaria na semana. Opcional/ausente em relatórios antigos,
+  // gerados antes deste recurso.
+  portaria?: {
+    ocorrencias: { colaborador: string; texto: string; em: string }[];
+    entregues: number;
+    pendentes: number;
+    relatoriosEnviados: number;
+  };
+  // Atividade do grupo de WhatsApp na semana. Opcional/ausente em relatórios
+  // antigos.
+  whatsapp?: {
+    total: number;
+    porPrioridade: Record<Prioridade, number>;
+    destaques: { autor: string; prioridade: Prioridade | null; texto: string; em: string }[];
+  };
   // Resumo executivo + insights gerados por IA a partir dos dados acima.
   // Opcional: null/ausente quando a IA está indisponível (ou em relatórios
   // antigos, gerados antes deste recurso).
@@ -126,6 +141,45 @@ export function montarResumoMarkdown(dados: RelatorioDados, periodo: Periodo): s
         `- ${dataCurtaBRT(m.em)}: **${m.servicoTitulo}** — ${de}${STATUS_LABEL[m.para]}`,
       );
     }
+  }
+  linhas.push('');
+
+  linhas.push('## Portaria na semana');
+  if (dados.portaria) {
+    const { ocorrencias, entregues, pendentes, relatoriosEnviados } = dados.portaria;
+    linhas.push(
+      `- Ocorrências registradas: ${ocorrencias.length}`,
+      `- Encomendas entregues: ${entregues}`,
+      `- Encomendas aguardando retirada: ${pendentes}`,
+      `- Relatórios enviados à administração: ${relatoriosEnviados}`,
+    );
+    if (ocorrencias.length > 0) {
+      linhas.push('', 'Ocorrências:');
+      for (const o of ocorrencias) {
+        linhas.push(`- ${dataCurtaBRT(o.em)} — ${o.colaborador}: ${o.texto}`);
+      }
+    }
+  } else {
+    linhas.push('Sem dados de portaria neste período.');
+  }
+  linhas.push('');
+
+  linhas.push('## WhatsApp na semana');
+  if (dados.whatsapp) {
+    const { total, porPrioridade, destaques } = dados.whatsapp;
+    linhas.push(`- Mensagens recebidas: ${total}`);
+    for (const p of PRIORIDADE_ORDEM) {
+      linhas.push(`- ${PRIORIDADE_LABEL[p]}: ${porPrioridade[p] ?? 0}`);
+    }
+    if (destaques.length > 0) {
+      linhas.push('', 'Destaques (alta/urgente):');
+      for (const d of destaques) {
+        const prio = d.prioridade ? `${PRIORIDADE_LABEL[d.prioridade]} — ` : '';
+        linhas.push(`- ${dataCurtaBRT(d.em)} — ${prio}**${d.autor}**: ${d.texto}`);
+      }
+    }
+  } else {
+    linhas.push('Sem dados de WhatsApp neste período.');
   }
 
   return linhas.join('\n');
