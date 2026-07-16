@@ -177,7 +177,12 @@ src/
 1. Crie o projeto Supabase e copie as connection strings (Settings → Database):
    - `DATABASE_URL` = *Transaction pooler* (porta **6543**)
    - `DIRECT_URL` = conexão direta / *Session* (porta **5432**)
-2. Rode as migrations contra o Supabase: `npx prisma migrate deploy` (usa `DIRECT_URL` do seu `.env`).
+2. **Aplique as migrations ao Supabase antes/depois de mexer no schema:**
+   `npx prisma migrate deploy` (usa `DIRECT_URL` do seu `.env`). As migrations **não**
+   rodam no build da Vercel — a conexão direta do Supabase costuma não ser acessível
+   de dentro do build —, então este passo é manual e precisa ser repetido sempre que
+   houver migrations novas. (Alternativa sem Prisma: rodar o SQL das migrations no
+   *SQL Editor* do Supabase.)
 3. Na Vercel, configure as envs do `.env.example` (exceto as da Fase 4, por enquanto).
    Com `CRON_SECRET` definida, o Vercel Cron envia `Authorization: Bearer $CRON_SECRET` automaticamente.
 4. Os crons estão declarados em `vercel.json` (lembretes: `0 11 * * *` UTC = 08h BRT).
