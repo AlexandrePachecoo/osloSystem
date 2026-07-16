@@ -132,6 +132,10 @@ model Lembrete {
   // "Adiar": some das listas de ativos até esta data/hora, então reaparece.
   // null = nunca adiado. Não afeta o índice parcial (segue 1 ativo por serviço).
   adiadoAte DateTime?
+  // "Agendar": lembrete criado para o futuro. Só entra nas listas de ativos
+  // (painel/lembretes) a partir desta data. null = vale desde já. Mesma lógica
+  // de exibição do adiadoAte; não afeta o índice parcial.
+  agendadoPara DateTime?
   createdAt DateTime @default(now())
 
   // Índice parcial (1 lembrete NÃO resolvido por serviço) criado à mão na
