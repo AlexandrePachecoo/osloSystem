@@ -3,6 +3,7 @@ import { env } from '@/lib/env';
 import { prisma } from '@/lib/prisma';
 import { montarContextoSistema } from '@/lib/contexto-ia';
 import { Prioridade } from '@/generated/prisma/enums';
+import { STATUS_TERMINAIS } from '@/domain/servico-status';
 
 // Assistente de gerenciamento do painel: conversa com o admin e executa
 // ações no sistema via function calling da OpenAI. Exemplos:
@@ -20,6 +21,7 @@ Regras:
 - Quando o administrador relatar um fato que corresponde a uma ação (problema sendo resolvido → criar serviço; aviso/informação para os moradores → salvar contexto; coisa a não esquecer → criar lembrete; material usado/comprado → movimentar estoque), execute a ação em vez de apenas responder.
 - Um lembrete pode ser agendado para uma data futura ("me lembra de cobrar a empresa X dia 20", "semana que vem"): calcule a data absoluta (YYYY-MM-DD) a partir da data atual informada e passe em agendadoPara. Sem data explícita, deixe null (vale desde já).
 - Um problema que JÁ está sendo resolvido entra como serviço "em_andamento"; um problema novo ainda sem solução contratada entra como "orcamento".
+- Para excluir um serviço, use listar_servicos antes para descobrir o servicoId e então chame excluir_servico. Só dá para excluir serviços em orçamento ou já encerrados (feito/rejeitado); se o serviço estiver aprovado ou em andamento, explique que é preciso mudar o status antes.
 - Avisos e informações gerais (eventos, obras, mudanças de regra) devem ser salvos como contexto: eles alimentam as respostas automáticas do WhatsApp aos moradores.
 - Depois de executar uma ação, confirme em uma frase o que foi feito.
 - Se faltar informação essencial (ex.: título do serviço impossível de deduzir), pergunte antes de agir. Não invente dados.
@@ -38,6 +40,10 @@ const criarServicoArgs = z.object({
 
 const listarServicosArgs = z.object({
   status: z.enum(['orcamento', 'aprovado', 'em_andamento', 'feito', 'rejeitado']).nullish(),
+});
+
+const excluirServicoArgs = z.object({
+  servicoId: z.string().min(1),
 });
 
 const criarLembreteArgs = z.object({
@@ -106,6 +112,22 @@ const TOOL_DEFS = [
           },
         },
         required: ['titulo', 'descricao', 'status', 'prioridade', 'empresaNome'],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'excluir_servico',
+      description:
+        'Exclui um serviço do sistema. Use listar_servicos antes para obter o servicoId. Só é possível excluir serviços em orçamento ou já encerrados (feito/rejeitado); serviços aprovados ou em andamento não podem ser excluídos.',
+      parameters: {
+        type: 'object',
+        properties: {
+          servicoId: { type: 'string', description: 'ID do serviço, obtido em listar_servicos.' },
+        },
+        required: ['servicoId'],
         additionalProperties: false,
       },
     },
@@ -204,6 +226,7 @@ async function executarFerramenta(nome: string, argsJson: string): Promise<strin
         });
         return JSON.stringify(
           servicos.map((s) => ({
+            id: s.id,
             titulo: s.titulo,
             status: s.status,
             prioridade: s.prioridade,
@@ -231,6 +254,27 @@ async function executarFerramenta(nome: string, argsJson: string): Promise<strin
           return criado;
         });
         return JSON.stringify({ ok: true, id: servico.id, titulo: servico.titulo, status: servico.status });
+      }
+
+      case 'excluir_servico': {
+        const { servicoId } = excluirServicoArgs.parse(args);
+        const servico = await prisma.servico.findUnique({
+          where: { id: servicoId },
+          select: { status: true, titulo: true },
+        });
+        if (!servico) return JSON.stringify({ ok: false, erro: 'serviço não encontrado' });
+        // Mesma regra do painel: preserva o histórico dos serviços que estão
+        // no meio do fluxo (aprovado/em_andamento).
+        const podeExcluir =
+          STATUS_TERMINAIS.includes(servico.status) || servico.status === 'orcamento';
+        if (!podeExcluir) {
+          return JSON.stringify({
+            ok: false,
+            erro: `serviço "${servico.titulo}" está com status "${servico.status}" e não pode ser excluído — só orçamento ou encerrados (feito/rejeitado). Mude o status antes.`,
+          });
+        }
+        await prisma.servico.delete({ where: { id: servicoId } });
+        return JSON.stringify({ ok: true, excluido: servico.titulo });
       }
 
       case 'criar_lembrete': {
