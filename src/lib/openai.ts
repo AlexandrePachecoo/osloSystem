@@ -174,11 +174,11 @@ export async function classificarMensagem(
 // (markdown determinístico) e devolve um resumo curto com insights. Mesma
 // política de falha das demais: retorna null em qualquer problema — o relatório
 // determinístico continua valendo e a página só esconde o bloco de IA.
-const RESUMO_RELATORIO_PROMPT = `Você é o assistente da administração de um condomínio residencial pequeno no Brasil. Recebe o relatório semanal já consolidado (serviços por status, prioridades pendentes, lembretes ativos, estoque abaixo do mínimo e movimentações da semana) e produz um resumo executivo para o síndico.
+const RESUMO_RELATORIO_PROMPT = `Você é o assistente da administração de um condomínio residencial pequeno no Brasil. Recebe o relatório semanal já consolidado (serviços por status, prioridades pendentes, lembretes ativos, estoque abaixo do mínimo, movimentações da semana, movimento da portaria — ocorrências e encomendas — e a atividade do grupo de WhatsApp) e produz um resumo executivo para o síndico.
 
 Escreva em português do Brasil, em markdown, com esta estrutura:
-- Um parágrafo curto (2 a 4 frases) resumindo como está a semana no geral.
-- Em seguida, uma lista "**Insights e alertas:**" com 2 a 5 itens objetivos. Destaque padrões que exigem atenção: serviços de alta/urgente parados, lembretes ou problemas que já se arrastam há tempo (ex.: um vazamento em aberto há semanas), estoque crítico e gargalos. Se algo estiver bem, pode registrar em no máximo 1 item.
+- Um parágrafo curto (2 a 4 frases) resumindo como está a semana no geral, cruzando as áreas quando fizer sentido (ex.: uma reclamação recorrente no WhatsApp que ainda não virou serviço, ou uma ocorrência de portaria ligada a um problema em aberto).
+- Em seguida, uma lista "**Insights e alertas:**" com 2 a 5 itens objetivos. Destaque padrões que exigem atenção: serviços de alta/urgente parados, lembretes ou problemas que já se arrastam há tempo (ex.: um vazamento em aberto há semanas), estoque crítico, encomendas paradas na portaria, mensagens urgentes dos moradores e gargalos. Se algo estiver bem, pode registrar em no máximo 1 item.
 
 Regras:
 - Use SOMENTE os dados do relatório. Não invente números, prazos, nomes ou causas.

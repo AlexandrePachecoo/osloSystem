@@ -4,7 +4,13 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { CopyButton } from '@/components/copy-button';
 import { StatusBadge, PrioridadeBadge } from '@/components/badges';
-import { STATUS_LABEL, STATUS_ORDEM, formatarData } from '@/lib/format';
+import {
+  STATUS_LABEL,
+  STATUS_ORDEM,
+  PRIORIDADE_LABEL,
+  PRIORIDADE_ORDEM,
+  formatarData,
+} from '@/lib/format';
 import type { RelatorioDados } from '@/domain/relatorio';
 
 export const dynamic = 'force-dynamic';
@@ -192,6 +198,80 @@ export default async function RelatorioDetalhePage({
           </ul>
         )}
       </section>
+
+      {dados.portaria && (
+        <section className="space-y-2">
+          <h2 className="text-lg font-medium">Portaria na semana</h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <div className="text-2xl font-semibold">{dados.portaria.ocorrencias.length}</div>
+              <div className="mt-1 text-sm text-slate-500">Ocorrências</div>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <div className="text-2xl font-semibold">{dados.portaria.entregues}</div>
+              <div className="mt-1 text-sm text-slate-500">Encomendas entregues</div>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <div className="text-2xl font-semibold">{dados.portaria.pendentes}</div>
+              <div className="mt-1 text-sm text-slate-500">Aguardando retirada</div>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-white p-4">
+              <div className="text-2xl font-semibold">
+                {dados.portaria.relatoriosEnviados}
+              </div>
+              <div className="mt-1 text-sm text-slate-500">Relatórios enviados</div>
+            </div>
+          </div>
+          {dados.portaria.ocorrencias.length > 0 && (
+            <ul className="space-y-2">
+              {dados.portaria.ocorrencias.map((o, i) => (
+                <li
+                  key={i}
+                  className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm"
+                >
+                  <span className="text-slate-500">{formatarData(new Date(o.em))}</span> —{' '}
+                  <strong>{o.colaborador}</strong>: {o.texto}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+      {dados.whatsapp && (
+        <section className="space-y-2">
+          <h2 className="text-lg font-medium">WhatsApp na semana</h2>
+          <p className="text-sm text-slate-500">
+            {dados.whatsapp.total}{' '}
+            {dados.whatsapp.total === 1 ? 'mensagem recebida' : 'mensagens recebidas'}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {PRIORIDADE_ORDEM.map((p) => (
+              <span
+                key={p}
+                className="rounded-md border border-slate-200 bg-white px-3 py-1 text-sm"
+              >
+                {PRIORIDADE_LABEL[p]}:{' '}
+                <strong>{dados.whatsapp!.porPrioridade[p] ?? 0}</strong>
+              </span>
+            ))}
+          </div>
+          {dados.whatsapp.destaques.length > 0 && (
+            <ul className="space-y-2">
+              {dados.whatsapp.destaques.map((d, i) => (
+                <li
+                  key={i}
+                  className="rounded-md border border-amber-200 bg-amber-50 px-4 py-2 text-sm"
+                >
+                  <span className="text-slate-500">{formatarData(new Date(d.em))}</span> —{' '}
+                  {d.prioridade && <>{PRIORIDADE_LABEL[d.prioridade]} — </>}
+                  <strong>{d.autor}</strong>: {d.texto}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       <section className="space-y-2">
         <div className="flex items-center justify-between">
