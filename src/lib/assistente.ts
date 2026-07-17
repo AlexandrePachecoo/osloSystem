@@ -21,7 +21,8 @@ Regras:
 - Quando o administrador relatar um fato que corresponde a uma ação (problema sendo resolvido → criar serviço; aviso/informação para os moradores → salvar contexto; coisa a não esquecer → criar lembrete; material usado/comprado → movimentar estoque; material novo que ainda não existe no estoque → cadastrar item), execute a ação em vez de apenas responder.
 - Estoque: para ajustar a quantidade de um item que já existe, use movimentar_estoque (busque o item antes). Para um material que ainda não está cadastrado, use criar_item_estoque; confira antes com buscar_estoque para não duplicar. Se o administrador não informar a unidade de medida de um item novo, pergunte.
 - Um lembrete pode ser agendado para uma data futura ("me lembra de cobrar a empresa X dia 20", "semana que vem"): calcule a data absoluta (YYYY-MM-DD) a partir da data atual informada e passe em agendadoPara. Sem data explícita, deixe null (vale desde já).
-- Um problema que JÁ está sendo resolvido entra como serviço "em_andamento"; um problema novo ainda sem solução contratada entra como "orcamento".
+- Status do serviço: se alguém JÁ está executando, consertando, mexendo, já comprou/usou material ou a obra começou → "em_andamento". Se ainda é só um problema a levantar orçamento, sem ninguém contratado trabalhando → "orcamento". Use "aprovado" quando um orçamento já foi escolhido mas o trabalho ainda não começou. Na dúvida entre orçamento e andamento, havendo alguém já trabalhando, escolha "em_andamento". Ex.: "o Paulo está resolvendo o vazamento no S1" → serviço "em_andamento".
+- Valor/custo/orçamento em reais (ex.: "ficou em 2 mil", "R$ 2.000", "custou 2000"): passe SÓ o número em valorOrcamento ao criar o serviço. Nunca escreva o valor apenas na descrição — o campo próprio é valorOrcamento.
 - Para excluir um serviço, use listar_servicos antes para descobrir o servicoId e então chame excluir_servico. Só dá para excluir serviços em orçamento ou já encerrados (feito/rejeitado); se o serviço estiver aprovado ou em andamento, explique que é preciso mudar o status antes.
 - Avisos e informações gerais (eventos, obras, mudanças de regra) devem ser salvos como contexto: eles alimentam as respostas automáticas do WhatsApp aos moradores.
 - Depois de executar uma ação, confirme em uma frase o que foi feito.
@@ -34,6 +35,8 @@ Regras:
 const criarServicoArgs = z.object({
   titulo: z.string().trim().min(1).max(200),
   descricao: z.string().trim().max(5000).nullish(),
+  // Valor estimado/orçado do serviço, em reais. Vai no campo próprio, nunca na descrição.
+  valorOrcamento: z.number().nonnegative().nullish(),
   status: z.enum(['orcamento', 'aprovado', 'em_andamento']).default('orcamento'),
   prioridade: z.enum(Prioridade).default('media'),
   empresaNome: z.string().trim().max(200).nullish(),
@@ -103,23 +106,29 @@ const TOOL_DEFS = [
     function: {
       name: 'criar_servico',
       description:
-        'Cria um serviço no sistema. Use status "em_andamento" quando o problema já está sendo resolvido, "orcamento" para problema novo.',
+        'Cria um serviço no sistema. Use status "em_andamento" quando alguém já está executando/consertando o problema (ainda que só tenha comprado material ou começado), "orcamento" para um problema novo ainda sem ninguém contratado. Se houver valor em reais, use valorOrcamento — não jogue o valor na descrição.',
       parameters: {
         type: 'object',
         properties: {
           titulo: { type: 'string', description: 'Título curto, ex.: "Vazamento no S2"' },
           descricao: {
             type: ['string', 'null'],
-            description: 'Detalhes relatados (quem está resolvendo, onde, desde quando).',
+            description:
+              'Detalhes relatados (quem está resolvendo, onde, desde quando). NÃO inclua o valor aqui — use valorOrcamento.',
+          },
+          valorOrcamento: {
+            type: ['number', 'null'],
+            description:
+              'Valor do orçamento em reais, só o número (ex.: 2000 para "R$ 2.000" ou "2 mil"). null se não houver valor citado.',
           },
           status: { type: 'string', enum: ['orcamento', 'aprovado', 'em_andamento'] },
           prioridade: { type: 'string', enum: ['baixa', 'media', 'alta', 'urgente'] },
           empresaNome: {
             type: ['string', 'null'],
-            description: 'Nome da empresa responsável, se citada (não precisa estar cadastrada).',
+            description: 'Nome da empresa/pessoa responsável, se citada (não precisa estar cadastrada).',
           },
         },
-        required: ['titulo', 'descricao', 'status', 'prioridade', 'empresaNome'],
+        required: ['titulo', 'descricao', 'valorOrcamento', 'status', 'prioridade', 'empresaNome'],
         additionalProperties: false,
       },
     },
@@ -281,6 +290,7 @@ async function executarFerramenta(nome: string, argsJson: string): Promise<strin
             data: {
               titulo: dados.titulo,
               descricao: dados.descricao ?? null,
+              valorOrcamento: dados.valorOrcamento ?? null,
               status: dados.status,
               prioridade: dados.prioridade,
               empresaNome: dados.empresaNome ?? null,
@@ -291,7 +301,13 @@ async function executarFerramenta(nome: string, argsJson: string): Promise<strin
           });
           return criado;
         });
-        return JSON.stringify({ ok: true, id: servico.id, titulo: servico.titulo, status: servico.status });
+        return JSON.stringify({
+          ok: true,
+          id: servico.id,
+          titulo: servico.titulo,
+          status: servico.status,
+          valorOrcamento: servico.valorOrcamento ? Number(servico.valorOrcamento) : null,
+        });
       }
 
       case 'excluir_servico': {
@@ -335,11 +351,32 @@ async function executarFerramenta(nome: string, argsJson: string): Promise<strin
 
       case 'buscar_estoque': {
         const { nome } = buscarEstoqueArgs.parse(args);
-        const itens = await prisma.itemEstoque.findMany({
-          where: { nome: { contains: nome, mode: 'insensitive' } },
-          select: { id: true, nome: true, quantidade: true, unidade: true },
+        // Quebra a busca em palavras: caixa, ordem e palavras extras no cadastro
+        // não devem atrapalhar. "caneta vermelha" acha "Caneta Esferográfica
+        // Vermelha" e também "CANETA VERMELHA".
+        const termos = nome.split(/\s+/).filter(Boolean);
+        const select = { id: true, nome: true, quantidade: true, unidade: true } as const;
+
+        // Primeiro tenta itens que contenham TODAS as palavras (mais preciso).
+        let itens = await prisma.itemEstoque.findMany({
+          where: {
+            AND: termos.map((t) => ({ nome: { contains: t, mode: 'insensitive' as const } })),
+          },
+          select,
           take: 10,
         });
+
+        // Se nada casou com todas juntas, afrouxa para QUALQUER palavra, para
+        // não deixar o item passar batido por uma palavra a mais ou a menos.
+        if (itens.length === 0 && termos.length > 1) {
+          itens = await prisma.itemEstoque.findMany({
+            where: {
+              OR: termos.map((t) => ({ nome: { contains: t, mode: 'insensitive' as const } })),
+            },
+            select,
+            take: 10,
+          });
+        }
         return JSON.stringify(itens);
       }
 
