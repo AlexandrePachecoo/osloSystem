@@ -18,12 +18,13 @@ export function NotaContextoForm() {
 
   return (
     <form ref={formRef} action={formAction} className="space-y-2">
-      <div className="flex gap-2">
-        <input
+      <div className="flex items-start gap-2">
+        <textarea
           name="texto"
           required
+          rows={2}
           placeholder="Ex.: festa junina no salão dia 12/09 às 19h"
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+          className="w-full resize-y rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
         />
         <button
           type="submit"
