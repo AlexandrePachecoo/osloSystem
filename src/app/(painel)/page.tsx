@@ -4,8 +4,7 @@ import { env } from '@/lib/env';
 import { STATUS_LABEL, STATUS_ORDEM, formatarData } from '@/lib/format';
 import { AssistenteChat } from '@/components/assistente-chat';
 import { EstoqueRapido } from '@/components/estoque-rapido';
-import { NotaContextoForm } from '@/components/nota-contexto-form';
-import { desativarNotaContexto } from '@/actions/assistente';
+import { ContextoIA } from '@/components/contexto-ia';
 import { adiarLembrete, resolverLembrete } from '@/actions/lembretes';
 import type { ServicoStatus } from '@/generated/prisma/enums';
 
@@ -90,38 +89,13 @@ export default async function DashboardPage() {
         <div className="space-y-6">
           <EstoqueRapido itens={itensEstoque} />
 
-          <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
-            <div>
-              <h2 className="text-sm font-semibold text-slate-600">Contexto da IA</h2>
-              <p className="text-xs text-slate-400">
-                Avisos e informações que a IA usa ao responder moradores no WhatsApp.
-              </p>
-            </div>
-            <NotaContextoForm />
-            {notas.length === 0 ? (
-              <p className="text-sm text-slate-500">Nenhuma informação registrada.</p>
-            ) : (
-              <ul className="divide-y divide-slate-100">
-                {notas.map((n) => (
-                  <li key={n.id} className="flex items-start justify-between gap-3 py-2 text-sm">
-                    <div>
-                      <p className="text-slate-700">{n.texto}</p>
-                      <p className="mt-0.5 text-xs text-slate-400">{formatarData(n.createdAt)}</p>
-                    </div>
-                    <form action={desativarNotaContexto}>
-                      <input type="hidden" name="id" value={n.id} />
-                      <button
-                        type="submit"
-                        className="text-xs text-slate-400 hover:text-red-600"
-                      >
-                        Remover
-                      </button>
-                    </form>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <ContextoIA
+            notas={notas.map((n) => ({
+              id: n.id,
+              texto: n.texto,
+              data: formatarData(n.createdAt),
+            }))}
+          />
         </div>
       </div>
 

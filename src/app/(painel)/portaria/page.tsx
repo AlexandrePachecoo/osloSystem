@@ -52,41 +52,10 @@ export default async function PortariaPage() {
         </a>
       </div>
 
-      <PortariaRegistro funcionarios={nomes} />
+      {/* Envio do relatório fica no topo, junto com o nome do colaborador */}
+      <EnviarRelatorioPortaria funcionarios={nomes} />
 
-      {/* Ocorrências do relatório atual */}
-      <section className="space-y-2">
-        <h2 className="text-lg font-semibold">
-          Ocorrências do período{' '}
-          <span className="text-sm font-normal text-slate-500">
-            ({aberto.ocorrencias.length})
-          </span>
-        </h2>
-        {aberto.ocorrencias.length === 0 ? (
-          <p className="text-sm text-slate-500">Nenhuma ocorrência registrada no período.</p>
-        ) : (
-          <ul className="space-y-2">
-            {aberto.ocorrencias.map((o) => (
-              <li
-                key={o.id}
-                className="flex items-start justify-between gap-4 rounded-lg border border-slate-200 bg-white p-4"
-              >
-                <div>
-                  <p className="text-xs text-slate-500">
-                    {formatarData(o.createdAt)} — {o.colaborador}
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap text-sm">{o.texto}</p>
-                </div>
-                <ConfirmDeleteButton
-                  action={excluirOcorrencia}
-                  id={o.id}
-                  mensagem="Excluir esta ocorrência?"
-                />
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <PortariaRegistro funcionarios={nomes} />
 
       {/* Encomendas aguardando retirada — carregam de relatórios anteriores */}
       <section className="space-y-2">
@@ -145,6 +114,40 @@ export default async function PortariaPage() {
         )}
       </section>
 
+      {/* Ocorrências do relatório atual */}
+      <section className="space-y-2">
+        <h2 className="text-lg font-semibold">
+          Ocorrências do período{' '}
+          <span className="text-sm font-normal text-slate-500">
+            ({aberto.ocorrencias.length})
+          </span>
+        </h2>
+        {aberto.ocorrencias.length === 0 ? (
+          <p className="text-sm text-slate-500">Nenhuma ocorrência registrada no período.</p>
+        ) : (
+          <ul className="space-y-2">
+            {aberto.ocorrencias.map((o) => (
+              <li
+                key={o.id}
+                className="flex items-start justify-between gap-4 rounded-lg border border-slate-200 bg-white p-4"
+              >
+                <div>
+                  <p className="text-xs text-slate-500">
+                    {formatarData(o.createdAt)} — {o.colaborador}
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm">{o.texto}</p>
+                </div>
+                <ConfirmDeleteButton
+                  action={excluirOcorrencia}
+                  id={o.id}
+                  mensagem="Excluir esta ocorrência?"
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       {/* Entregas baixadas desde o último envio */}
       <section className="space-y-2">
         <h2 className="text-lg font-semibold">
@@ -171,8 +174,6 @@ export default async function PortariaPage() {
           </ul>
         )}
       </section>
-
-      <EnviarRelatorioPortaria funcionarios={nomes} />
 
       {/* Últimos relatórios enviados */}
       <section className="space-y-2">
