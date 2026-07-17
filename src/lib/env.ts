@@ -25,6 +25,12 @@ const envSchema = z.object({
   WHATSAPP_VERIFY_TOKEN: z.string().optional(),
   WHATSAPP_APP_SECRET: z.string().optional(),
   WHATSAPP_GRAPH_VERSION: z.string().default('v21.0'),
+  // Coexistence (Embedded Signup) — opcionais: sem elas a página
+  // /whatsapp/conectar apenas explica o que falta configurar.
+  // NEXT_PUBLIC_* porque o FB JS SDK roda no navegador; o app id também é
+  // usado no servidor como client_id na troca do code por token.
+  NEXT_PUBLIC_META_APP_ID: z.string().optional(),
+  NEXT_PUBLIC_WHATSAPP_ES_CONFIG_ID: z.string().optional(),
 });
 
 export const env = envSchema.parse({
@@ -42,4 +48,6 @@ export const env = envSchema.parse({
   WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN,
   WHATSAPP_APP_SECRET: process.env.WHATSAPP_APP_SECRET,
   WHATSAPP_GRAPH_VERSION: process.env.WHATSAPP_GRAPH_VERSION,
+  NEXT_PUBLIC_META_APP_ID: process.env.NEXT_PUBLIC_META_APP_ID,
+  NEXT_PUBLIC_WHATSAPP_ES_CONFIG_ID: process.env.NEXT_PUBLIC_WHATSAPP_ES_CONFIG_ID,
 });

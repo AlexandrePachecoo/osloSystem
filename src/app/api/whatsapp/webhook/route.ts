@@ -1,19 +1,29 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { env } from '@/lib/env';
+import { prisma } from '@/lib/prisma';
 import { processarMensagemRecebida } from '@/lib/whatsapp/pipeline';
 import type { MensagemEntrada } from '@/lib/whatsapp/provider';
 
 export const dynamic = 'force-dynamic';
 
-// Webhook da Meta WhatsApp Cloud API.
+// Webhook da Meta WhatsApp Cloud API — com suporte a Coexistence (número
+// compartilhado entre o app WhatsApp Business e a Cloud API).
 //
 // GET  → handshake de verificação: a Meta chama uma vez ao configurar a URL,
 //        esperando de volta o hub.challenge se o hub.verify_token bater.
-// POST → mensagens recebidas: valida a assinatura X-Hub-Signature-256 com o
-//        App Secret, normaliza cada mensagem de texto e reusa o pipeline
-//        (mesmo caminho do endpoint /ingest e do mock). Só DMs de texto —
-//        grupos não são suportados pela Cloud API; mídia e status são ignorados.
+// POST → dois campos tratados:
+//        - `messages`: mensagens recebidas. Valida a assinatura
+//          X-Hub-Signature-256 com o App Secret, normaliza cada mensagem de
+//          texto e reusa o pipeline (mesmo caminho do /ingest e do mock).
+//          Só DMs de texto — grupos não sincronizam com a Cloud API (no
+//          Coexistence eles continuam funcionando SÓ no app); mídia e status
+//          são ignorados.
+//        - `smb_message_echoes` (Coexistence): eco de mensagem que o admin
+//          enviou pelo próprio celular (app Business). Carimbamos
+//          respondidaViaAppEm nas mensagens abertas daquele contato para a
+//          fila mostrar "já respondida pelo celular" — o status do rascunho
+//          NÃO muda sozinho (princípio do sistema: nada automático).
 
 export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
@@ -44,6 +54,7 @@ function assinaturaValida(rawBody: string, assinatura: string | null): boolean {
 type WebhookPayload = {
   entry?: {
     changes?: {
+      field?: string;
       value?: {
         contacts?: { wa_id?: string; profile?: { name?: string } }[];
         messages?: {
@@ -52,10 +63,34 @@ type WebhookPayload = {
           type?: string;
           text?: { body?: string };
         }[];
+        // Coexistence: mensagens enviadas pelo app Business/aparelho vinculado
+        message_echoes?: {
+          id?: string;
+          from?: string;
+          to?: string;
+          timestamp?: string;
+          type?: string;
+        }[];
       };
     }[];
   }[];
 };
+
+// Eco do app (Coexistence): o admin respondeu `to` pelo celular. Marca as
+// mensagens ainda abertas desse contato — idempotente na reentrega (updateMany
+// sobre as mesmas linhas produz o mesmo estado).
+async function registrarEcoDoApp(echo: { to?: string; timestamp?: string }) {
+  if (!echo.to) return; // sem destino identificável, nada a marcar
+  const ts = Number(echo.timestamp);
+  const respondidaEm = Number.isFinite(ts) && ts > 0 ? new Date(ts * 1000) : new Date();
+  await prisma.mensagemWhatsApp.updateMany({
+    where: {
+      remetente: echo.to,
+      rascunhoStatus: { in: ['pendente', 'aprovado'] },
+    },
+    data: { respondidaViaAppEm: respondidaEm },
+  });
+}
 
 export async function POST(request: Request) {
   // Corpo cru: a assinatura é sobre os bytes exatos, então lemos texto antes
@@ -78,6 +113,15 @@ export async function POST(request: Request) {
     for (const entry of payload.entry ?? []) {
       for (const change of entry.changes ?? []) {
         const value = change.value;
+
+        // Coexistence: respostas dadas pelo celular chegam como echoes.
+        if (change.field === 'smb_message_echoes') {
+          for (const echo of value?.message_echoes ?? []) {
+            await registrarEcoDoApp(echo);
+          }
+          continue;
+        }
+
         if (!value?.messages) continue;
 
         // Mapa wa_id → nome de perfil, para exibir o autor legível na fila.

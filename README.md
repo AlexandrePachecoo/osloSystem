@@ -130,6 +130,43 @@ src/
   (respostas a DMs recebidas caem sempre nessa janela). Só mensagens de **texto**
   são ingeridas por ora (mídia/status são ignorados).
 
+## WhatsApp Coexistence — implementado
+
+Conecta o número à Cloud API **sem tirá-lo do celular**: o mesmo número segue no
+app **WhatsApp Business** (grupos, chamadas, status e conversas normais
+continuam lá) e as DMs 1:1 passam a chegar também na fila do sistema. Nome
+oficial na Meta: *Onboarding WhatsApp Business app users*.
+
+- **Página `/whatsapp/conectar`**: abre o Embedded Signup da Meta em modo
+  Coexistence (`featureType: whatsapp_business_app_onboarding`). O dono escaneia
+  um **QR code com o app WhatsApp Business**; ao final o `code` é trocado por um
+  token de negócio no servidor (`POST /api/whatsapp/onboarding`, admin-only) e o
+  app é assinado nos webhooks da WABA (`subscribed_apps`). O token e o
+  *Phone Number ID* são exibidos para colocar nas envs — nada é persistido.
+- **Respostas dadas pelo celular** (webhook `smb_message_echoes`): quando o
+  admin responde um morador direto pelo app, o eco chega ao webhook e as
+  mensagens ainda abertas daquele contato ganham o carimbo
+  `respondidaViaAppEm` — a fila mostra o badge **"Respondida pelo celular"**.
+  Fiel ao princípio do sistema, o status do rascunho **não muda sozinho**: o
+  admin descarta manualmente se o assunto foi resolvido.
+- **Setup no painel da Meta** (uma vez):
+  1. App em *Meta for Developers* com os produtos **WhatsApp** e **Facebook
+     Login for Business**; empresa com **verificação de negócio** concluída.
+  2. Em *Facebook Login for Business > Configurations*, crie uma configuração
+     com o WhatsApp habilitado e copie o **Configuration ID** →
+     `NEXT_PUBLIC_WHATSAPP_ES_CONFIG_ID` (App ID → `NEXT_PUBLIC_META_APP_ID`).
+  3. Webhook: mesma URL `https://<seu-dominio>/api/whatsapp/webhook`, subscreva
+     aos campos **`messages`** e **`smb_message_echoes`**.
+  4. No celular: o número deve estar no app **WhatsApp Business** atualizado
+     (≥ 2.24.17). Conta muito nova pode não ser elegível ainda (critério da
+     Meta: tempo de conta e qualidade).
+  5. Acesse `/whatsapp/conectar`, conclua o fluxo e copie
+     `WHATSAPP_ACCESS_TOKEN`/`WHATSAPP_PHONE_NUMBER_ID` + `WHATSAPP_PROVIDER=meta`
+     para o ambiente; redeploy.
+- **Limitações do Coexistence**: **grupos não sincronizam** com a API (seguem
+  funcionando normalmente, mas só no app); chamadas de voz/vídeo só no app; a
+  janela de 24h para texto livre continua valendo nos envios pela API.
+
 ## Fase 8 — implementada
 
 - **Dois papéis de login**: `ADMIN_PASSWORD` → admin (acesso a tudo) e
