@@ -225,6 +225,19 @@ model RelatorioPortaria {
   encomendas  EncomendaPortaria[]
 }
 
+// Inscrições de Web Push (PWA). Cada dispositivo/navegador que ativa as
+// notificações grava um endpoint único aqui. O envio (lembretes e mensagens do
+// WhatsApp) percorre todas as inscrições; endpoints mortos (404/410) são
+// removidos na hora do envio. Fica vazio/ocioso sem as chaves VAPID no servidor.
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model MensagemWhatsApp {
   id               String         @id @default(cuid())
   textoOriginal    String

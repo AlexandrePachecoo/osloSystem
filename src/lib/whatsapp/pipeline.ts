@@ -1,6 +1,8 @@
 import { prisma } from '@/lib/prisma';
 import { classificarMensagem } from '@/lib/openai';
 import { montarContextoSistema } from '@/lib/contexto-ia';
+import { enviarPushParaTodos } from '@/lib/push';
+import { PRIORIDADE_LABEL } from '@/lib/format';
 import type { MensagemEntrada } from '@/lib/whatsapp/provider';
 
 // Pipeline de ingestão: mensagem recebida → salva → classifica prioridade e
@@ -35,16 +37,35 @@ export async function processarMensagemRecebida(entrada: MensagemEntrada) {
   });
 
   const classificacao = await classificarMensagem(entrada.autor, entrada.texto, contexto);
-  if (!classificacao) {
-    return { mensagem, duplicada: false };
-  }
 
-  const atualizada = await prisma.mensagemWhatsApp.update({
-    where: { id: mensagem.id },
-    data: {
-      prioridade: classificacao.prioridade,
-      rascunhoResposta: classificacao.rascunho,
-    },
-  });
+  const atualizada = classificacao
+    ? await prisma.mensagemWhatsApp.update({
+        where: { id: mensagem.id },
+        data: {
+          prioridade: classificacao.prioridade,
+          rascunhoResposta: classificacao.rascunho,
+        },
+      })
+    : mensagem;
+
+  // Notifica o admin de que há uma mensagem nova aguardando aprovação. A
+  // classificação (se houve) entra no corpo. Falha de push nunca derruba a
+  // ingestão — enviarPushParaTodos já engole os erros internamente.
+  const prioridade = atualizada.prioridade;
+  await enviarPushParaTodos({
+    title: prioridade
+      ? `WhatsApp — ${PRIORIDADE_LABEL[prioridade]}`
+      : 'WhatsApp — nova mensagem',
+    body: `${atualizada.autor}: ${resumir(atualizada.textoOriginal)}`,
+    url: '/whatsapp',
+    tag: 'whatsapp',
+  }).catch((erro) => console.error('[whatsapp] falha ao notificar:', erro));
+
   return { mensagem: atualizada, duplicada: false };
+}
+
+// Encurta o texto para caber no corpo da notificação.
+function resumir(texto: string, max = 120): string {
+  const limpo = texto.replace(/\s+/g, ' ').trim();
+  return limpo.length > max ? `${limpo.slice(0, max - 1)}…` : limpo;
 }

@@ -88,8 +88,8 @@ export function MensagemCard({ mensagem }: { mensagem: MensagemView }) {
       {editavel ? (
         <form action={salvarAction} className="space-y-2">
           <input type="hidden" name="id" value={mensagem.id} />
-          <div className="flex items-end gap-3">
-            <label className="block text-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <label className="block text-sm sm:w-44">
               <span className="mb-1 block text-xs font-medium text-slate-500">Prioridade</span>
               <select
                 name="prioridade"

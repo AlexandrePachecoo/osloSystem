@@ -53,7 +53,7 @@ export default async function LembretesPage() {
         {ativos.map((l) => (
           <div
             key={l.id}
-            className="flex items-center justify-between gap-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm"
+            className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm"
           >
             <div>
               {l.servico ? (
@@ -102,7 +102,7 @@ export default async function LembretesPage() {
           {adiados.map((l) => (
             <div
               key={l.id}
-              className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm"
+              className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm"
             >
               <div>
                 {l.servico ? (
@@ -151,7 +151,7 @@ export default async function LembretesPage() {
           {agendados.map((l) => (
             <div
               key={l.id}
-              className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm"
+              className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm"
             >
               <div>
                 {l.servico ? (

@@ -154,6 +154,31 @@ src/
 - **PDF** (`GET /api/portaria/relatorio/pdf[?id=...]`): baixa o relatório atual
   ou um já enviado, gerado com `pdf-lib` (JS puro, funciona em serverless).
 
+## Fase 9 — implementada
+
+- **Notificações no celular (Web Push / PWA)**: o painel virou um PWA instalável
+  (`app/manifest.ts` + `public/sw.js` + ícones em `public/`). No dashboard há o
+  card **"Notificações no celular"** — o admin ativa/desativa por dispositivo e
+  pode disparar um teste. As inscrições ficam em `PushSubscription`; endpoints
+  mortos (404/410) são removidos no envio.
+- **Push de lembretes**: o cron diário `/api/cron/lembretes` manda um único push
+  com a contagem de lembretes ativos do dia (automáticos, manuais e agendados que
+  venceram) — cai no celular às 08h BRT junto com a geração dos lembretes.
+- **Push do WhatsApp**: toda mensagem nova que entra na fila dispara um push
+  ("aprovar mensagem"), com autor e prioridade classificada no corpo, levando
+  direto para `/whatsapp`.
+- **Degradação suave**: sem o par de chaves VAPID
+  (`NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`) o envio fica inerte, o
+  card avisa e o resto do app funciona normal — mesmo padrão da OpenAI/WhatsApp.
+  Gere as chaves com `npx web-push generate-vapid-keys`.
+- **Experiência mobile**: navegação com menu sanfonado (hambúrguer) no celular e
+  header fixo; formulário de resposta do WhatsApp e listas de lembretes empilham
+  em telas estreitas; `viewport`/`theme-color` e ícone de tela inicial (iOS via
+  "Adicionar à Tela de Início").
+- **Migration nova**: `20260717000000_push_subscriptions` — rode
+  `npx prisma migrate deploy` antes/depois do deploy (as migrations não rodam no
+  build da Vercel).
+
 ## Rodando local
 
 1. Dependências: `npm install` (o `postinstall` gera o Prisma Client).
@@ -194,4 +219,5 @@ src/
   (imagem/áudio/documento) no webhook.
 - Alternativa para o grupo de avisos (não coberto pela Cloud API).
 - Envio externo de lembretes e do relatório semanal (e-mail/WhatsApp).
+- Suporte offline no PWA (Serwist) e notificações por e-mail além do Web Push.
 - Testes automatizados (as funções de `src/domain/` são puras e prontas para unit test).

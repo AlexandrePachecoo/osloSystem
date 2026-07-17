@@ -25,6 +25,14 @@ const envSchema = z.object({
   WHATSAPP_VERIFY_TOKEN: z.string().optional(),
   WHATSAPP_APP_SECRET: z.string().optional(),
   WHATSAPP_GRAPH_VERSION: z.string().default('v21.0'),
+  // --- Web Push / notificações (PWA) ---
+  // Opcionais: sem o par de chaves VAPID, as notificações ficam desativadas
+  // (o toggle no painel some/avisa) e o app continua funcionando normal.
+  // Gere com: npx web-push generate-vapid-keys
+  NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  // Contato exigido pelo protocolo VAPID (mailto: ou URL). Default seguro.
+  VAPID_SUBJECT: z.string().default('mailto:admin@oslo.local'),
 });
 
 export const env = envSchema.parse({
@@ -42,4 +50,7 @@ export const env = envSchema.parse({
   WHATSAPP_VERIFY_TOKEN: process.env.WHATSAPP_VERIFY_TOKEN,
   WHATSAPP_APP_SECRET: process.env.WHATSAPP_APP_SECRET,
   WHATSAPP_GRAPH_VERSION: process.env.WHATSAPP_GRAPH_VERSION,
+  NEXT_PUBLIC_VAPID_PUBLIC_KEY: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+  VAPID_PRIVATE_KEY: process.env.VAPID_PRIVATE_KEY,
+  VAPID_SUBJECT: process.env.VAPID_SUBJECT,
 });

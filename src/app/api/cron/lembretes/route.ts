@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { env } from '@/lib/env';
 import { isCronAuthorized } from '@/lib/cron-auth';
+import { enviarPushParaTodos } from '@/lib/push';
 import { STATUS_TERMINAIS } from '@/domain/servico-status';
 import { Prisma } from '@/generated/prisma/client';
 
@@ -77,9 +78,39 @@ export async function GET(request: Request) {
     }
   }
 
+  // Notificação diária: conta os lembretes ativos AGORA (automáticos + manuais
+  // e agendados que venceram — mesma lógica de exibição do painel) e manda um
+  // único push. Roda uma vez por dia com o cron, então não repete a cada request.
+  const agoraData = new Date();
+  const ativos = await prisma.lembrete.count({
+    where: {
+      resolvido: false,
+      AND: [
+        { OR: [{ adiadoAte: null }, { adiadoAte: { lte: agoraData } }] },
+        { OR: [{ agendadoPara: null }, { agendadoPara: { lte: agoraData } }] },
+      ],
+    },
+  });
+
+  let notificados = 0;
+  if (ativos > 0) {
+    const { enviados } = await enviarPushParaTodos({
+      title: 'Lembretes do condomínio',
+      body:
+        ativos === 1
+          ? 'Você tem 1 lembrete ativo hoje.'
+          : `Você tem ${ativos} lembretes ativos hoje.`,
+      url: '/lembretes',
+      tag: 'lembretes',
+    });
+    notificados = enviados;
+  }
+
   return NextResponse.json({
     ok: true,
     verificados: parados.length,
     lembretesCriados: criados,
+    lembretesAtivos: ativos,
+    notificados,
   });
 }

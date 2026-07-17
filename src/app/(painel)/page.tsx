@@ -4,6 +4,7 @@ import { env } from '@/lib/env';
 import { STATUS_LABEL, STATUS_ORDEM, formatarData } from '@/lib/format';
 import { AssistenteChat } from '@/components/assistente-chat';
 import { EstoqueRapido } from '@/components/estoque-rapido';
+import { PushToggle } from '@/components/push-toggle';
 import { NotaContextoForm } from '@/components/nota-contexto-form';
 import { desativarNotaContexto } from '@/actions/assistente';
 import { adiarLembrete, resolverLembrete } from '@/actions/lembretes';
@@ -88,6 +89,8 @@ export default async function DashboardPage() {
         <AssistenteChat disponivel={Boolean(env.OPENAI_API_KEY)} />
 
         <div className="space-y-6">
+          <PushToggle vapidPublicKey={env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null} />
+
           <EstoqueRapido itens={itensEstoque} />
 
           <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4">
