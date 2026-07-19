@@ -225,6 +225,35 @@ model RelatorioPortaria {
   encomendas  EncomendaPortaria[]
 }
 
+// Jornais entregues nos apartamentos (ex.: Zero Hora, Correio do Povo). Cada
+// jornal tem uma lista FIXA de apartamentos assinantes; a portaria marca no dia
+// quais foram entregues (checkbox). O envio do relatório fecha o snapshot e
+// zera as marcações para o próximo dia. `torre` agrupa como no relatório antigo.
+model JornalPortaria {
+  id        String               @id @default(cuid())
+  nome      String
+  torre     String? // ex.: "A", "B" — agrupamento no relatório
+  ordem     Int                  @default(0)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  aptos     JornalAptoPortaria[]
+
+  @@index([torre])
+}
+
+model JornalAptoPortaria {
+  id        String         @id @default(cuid())
+  jornalId  String
+  jornal    JornalPortaria @relation(fields: [jornalId], references: [id], onDelete: Cascade)
+  apto      String
+  // Marcado no dia = entregue. Zera no envio do relatório.
+  entregue  Boolean        @default(false)
+  ordem     Int            @default(0)
+  createdAt DateTime       @default(now())
+
+  @@index([jornalId])
+}
+
 model MensagemWhatsApp {
   id               String         @id @default(cuid())
   textoOriginal    String

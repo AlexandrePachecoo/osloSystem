@@ -6,9 +6,17 @@
 // seguintes até a baixa da entrega.
 
 import { prisma } from '@/lib/prisma';
-import type { EncomendaPortaria, OcorrenciaPortaria } from '@/generated/prisma/client';
+import type {
+  EncomendaPortaria,
+  JornalAptoPortaria,
+  JornalPortaria,
+  OcorrenciaPortaria,
+} from '@/generated/prisma/client';
 import type { EncomendaTipo } from '@/generated/prisma/enums';
 import { formatarData } from '@/lib/format';
+
+// Jornal com sua lista fixa de apartamentos (marcações de entrega inclusas).
+export type JornalComAptos = JornalPortaria & { aptos: JornalAptoPortaria[] };
 
 export type RelatorioPortariaAberto = {
   ocorrencias: OcorrenciaPortaria[];
@@ -16,10 +24,12 @@ export type RelatorioPortariaAberto = {
   pendentes: EncomendaPortaria[];
   // entregues desde o último envio
   entregues: EncomendaPortaria[];
+  // jornais + apartamentos assinantes (com marcação de entrega do dia)
+  jornais: JornalComAptos[];
 };
 
 export async function carregarRelatorioAberto(): Promise<RelatorioPortariaAberto> {
-  const [ocorrencias, pendentes, entregues] = await Promise.all([
+  const [ocorrencias, pendentes, entregues, jornais] = await Promise.all([
     prisma.ocorrenciaPortaria.findMany({
       where: { relatorioId: null },
       orderBy: { createdAt: 'asc' },
@@ -32,8 +42,12 @@ export async function carregarRelatorioAberto(): Promise<RelatorioPortariaAberto
       where: { entregue: true, relatorioId: null },
       orderBy: { entregueEm: 'asc' },
     }),
+    prisma.jornalPortaria.findMany({
+      orderBy: [{ ordem: 'asc' }, { createdAt: 'asc' }],
+      include: { aptos: { orderBy: [{ ordem: 'asc' }, { createdAt: 'asc' }] } },
+    }),
   ]);
-  return { ocorrencias, pendentes, entregues };
+  return { ocorrencias, pendentes, entregues, jornais };
 }
 
 // Shape do JSON gravado em RelatorioPortaria.dados — snapshot imutável do
@@ -48,10 +62,19 @@ export type EncomendaSnapshot = {
   entregueEm: string | null; // ISO
 };
 
+// Snapshot dos jornais entregues no momento do envio (só apartamentos marcados).
+export type JornalSnapshot = {
+  nome: string;
+  torre: string | null;
+  aptosEntregues: string[];
+};
+
 export type DadosRelatorioPortaria = {
   ocorrencias: { colaborador: string; texto: string; registradaEm: string }[];
   entregues: EncomendaSnapshot[];
   pendentes: EncomendaSnapshot[];
+  // opcional: relatórios antigos (antes da Fase 9) não têm este campo
+  jornais?: JornalSnapshot[];
 };
 
 function encomendaSnapshot(e: EncomendaPortaria): EncomendaSnapshot {
@@ -66,6 +89,18 @@ function encomendaSnapshot(e: EncomendaPortaria): EncomendaSnapshot {
   };
 }
 
+// Só entram no snapshot os jornais com ao menos um apartamento marcado
+// (entregue) — é o "Jornais entregues" do relatório antigo.
+function jornaisSnapshot(jornais: JornalComAptos[]): JornalSnapshot[] {
+  return jornais
+    .map((j) => ({
+      nome: j.nome,
+      torre: j.torre,
+      aptosEntregues: j.aptos.filter((a) => a.entregue).map((a) => a.apto),
+    }))
+    .filter((j) => j.aptosEntregues.length > 0);
+}
+
 export function montarDados(aberto: RelatorioPortariaAberto): DadosRelatorioPortaria {
   return {
     ocorrencias: aberto.ocorrencias.map((o) => ({
@@ -75,6 +110,7 @@ export function montarDados(aberto: RelatorioPortariaAberto): DadosRelatorioPort
     })),
     entregues: aberto.entregues.map(encomendaSnapshot),
     pendentes: aberto.pendentes.map(encomendaSnapshot),
+    jornais: jornaisSnapshot(aberto.jornais),
   };
 }
 
@@ -113,5 +149,33 @@ export function montarResumo(colaborador: string, dados: DadosRelatorioPortaria)
     for (const e of dados.pendentes) linhas.push(`- ${descreverEncomenda(e)}`);
   }
 
+  const jornais = dados.jornais ?? [];
+  linhas.push('', 'Jornais entregues:');
+  if (jornais.length === 0) {
+    linhas.push('- Nenhum jornal entregue no período.');
+  } else {
+    for (const [torre, doTorre] of agruparJornaisPorTorre(jornais)) {
+      if (torre) linhas.push(`Torre ${torre}:`);
+      for (const j of doTorre) {
+        linhas.push(`- ${j.nome}: ${j.aptosEntregues.join(', ')}`);
+      }
+    }
+  }
+
   return linhas.join('\n');
+}
+
+// Agrupa os jornais por torre preservando a ordem de entrada. Jornais sem
+// torre entram sob a chave vazia (renderizada sem cabeçalho de torre).
+export function agruparJornaisPorTorre(
+  jornais: JornalSnapshot[],
+): [string, JornalSnapshot[]][] {
+  const grupos = new Map<string, JornalSnapshot[]>();
+  for (const j of jornais) {
+    const chave = j.torre ?? '';
+    const atual = grupos.get(chave);
+    if (atual) atual.push(j);
+    else grupos.set(chave, [j]);
+  }
+  return [...grupos.entries()];
 }

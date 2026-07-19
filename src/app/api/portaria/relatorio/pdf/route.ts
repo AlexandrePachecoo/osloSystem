@@ -18,12 +18,25 @@ import { formatarData } from '@/lib/format';
 
 export const dynamic = 'force-dynamic';
 
-function nomeArquivo(data: Date): string {
+// Normaliza o nome do colaborador para uso em nome de arquivo: sem acentos,
+// espaços viram hífen e só ASCII seguro sobra (evita header quebrado / download
+// com nome estranho). Vazio quando não há colaborador (relatório em aberto).
+function fatiaNome(colaborador: string): string {
+  const slug = colaborador
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // remove diacríticos
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
+  return slug ? `-${slug}` : '';
+}
+
+function nomeArquivo(data: Date, colaborador: string): string {
   const dia = new Intl.DateTimeFormat('en-CA', {
     dateStyle: 'short',
     timeZone: 'America/Sao_Paulo',
   }).format(data); // YYYY-MM-DD
-  return `relatorio-portaria-${dia}.pdf`;
+  return `relatorio-portaria${fatiaNome(colaborador)}-${dia}.pdf`;
 }
 
 export async function GET(request: NextRequest) {
@@ -38,6 +51,7 @@ export async function GET(request: NextRequest) {
   let dados: DadosRelatorioPortaria;
   let subtitulo: string;
   let referencia: Date;
+  let colaborador = '';
 
   if (id) {
     const relatorio = await prisma.relatorioPortaria.findUnique({ where: { id } });
@@ -46,6 +60,7 @@ export async function GET(request: NextRequest) {
     }
     dados = relatorio.dados as DadosRelatorioPortaria;
     referencia = relatorio.enviadoEm;
+    colaborador = relatorio.colaborador;
     subtitulo = `Enviado por ${relatorio.colaborador} em ${formatarData(relatorio.enviadoEm)}`;
   } else {
     dados = montarDados(await carregarRelatorioAberto());
@@ -58,7 +73,7 @@ export async function GET(request: NextRequest) {
   return new NextResponse(Buffer.from(pdf), {
     headers: {
       'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="${nomeArquivo(referencia)}"`,
+      'Content-Disposition': `attachment; filename="${nomeArquivo(referencia, colaborador)}"`,
       'Cache-Control': 'no-store',
     },
   });

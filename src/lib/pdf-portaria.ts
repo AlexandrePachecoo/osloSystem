@@ -5,7 +5,11 @@
 
 import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb } from 'pdf-lib';
 import { formatarData } from '@/lib/format';
-import type { DadosRelatorioPortaria, EncomendaSnapshot } from '@/lib/portaria';
+import {
+  agruparJornaisPorTorre,
+  type DadosRelatorioPortaria,
+  type EncomendaSnapshot,
+} from '@/lib/portaria';
 
 const A4 = { width: 595.28, height: 841.89 };
 const MARGEM = 50;
@@ -157,6 +161,26 @@ export async function gerarPdfRelatorioPortaria(params: {
   } else {
     for (const e of dados.entregues) {
       w.texto(`• ${linhaEncomenda(e)}`, { recuo: 4 });
+      w.espaco(4);
+    }
+  }
+  w.divisor();
+
+  const jornais = dados.jornais ?? [];
+  w.texto('Jornais entregues', { tamanho: 13, bold: true });
+  w.espaco(4);
+  if (jornais.length === 0) {
+    w.texto('Nenhum jornal entregue no período.', { cinza: true });
+  } else {
+    for (const [torre, doTorre] of agruparJornaisPorTorre(jornais)) {
+      if (torre) {
+        w.texto(`Torre ${torre}`, { tamanho: 11, bold: true });
+        w.espaco(2);
+      }
+      for (const j of doTorre) {
+        w.texto(`${j.nome}: ${j.aptosEntregues.join(', ')}`, { recuo: 4 });
+        w.espaco(2);
+      }
       w.espaco(4);
     }
   }

@@ -35,3 +35,26 @@ export const encomendaCreateSchema = z
 export const enviarRelatorioSchema = z.object({
   colaborador: z.string().trim().min(1, 'Informe o nome do colaborador').max(120),
 });
+
+export const jornalCreateSchema = z.object({
+  nome: z.string().trim().min(1, 'Informe o nome do jornal').max(120),
+  torre: z
+    .string()
+    .trim()
+    .max(40)
+    .transform((v) => (v === '' ? null : v))
+    .nullable()
+    .default(null),
+  // Apartamentos assinantes (lista fixa) — um por linha ou separados por vírgula.
+  aptos: z
+    .string()
+    .trim()
+    .max(4000)
+    .transform((v) =>
+      v
+        .split(/[\n,;]+/)
+        .map((a) => a.trim())
+        .filter(Boolean),
+    )
+    .pipe(z.array(z.string().max(20)).min(1, 'Informe ao menos um apartamento')),
+});
