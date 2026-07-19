@@ -263,6 +263,11 @@ model MensagemWhatsApp {
   prioridade       Prioridade?
   rascunhoResposta String?
   rascunhoStatus   RascunhoStatus @default(pendente)
+  // Coexistence: momento em que o webhook smb_message_echoes indicou que o
+  // admin já respondeu este contato direto pelo celular (app WhatsApp
+  // Business). Informativo — o status do rascunho NÃO muda sozinho; o admin
+  // vê o aviso na fila e descarta manualmente se quiser.
+  respondidaViaAppEm DateTime?
   recebidaEm       DateTime       @default(now())
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt

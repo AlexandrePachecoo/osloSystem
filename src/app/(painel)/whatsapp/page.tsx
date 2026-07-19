@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 import { MensagemCard, type MensagemView } from '@/components/mensagem-card';
 import { SimularMensagemForm } from '@/components/simular-mensagem-form';
@@ -15,6 +16,7 @@ function paraView(m: MensagemWhatsApp): MensagemView {
     rascunhoResposta: m.rascunhoResposta,
     rascunhoStatus: m.rascunhoStatus,
     recebidaEmFmt: formatarData(m.recebidaEm),
+    respondidaViaAppFmt: m.respondidaViaAppEm ? formatarData(m.respondidaViaAppEm) : null,
   };
 }
 
@@ -39,6 +41,12 @@ export default async function WhatsAppPage() {
           Fila de mensagens do grupo com prioridade classificada e rascunho de resposta.
           Nada é enviado automaticamente — aprovação e envio são sempre manuais.
         </p>
+        <Link
+          href="/whatsapp/conectar"
+          className="mt-2 inline-block text-sm text-blue-600 hover:underline"
+        >
+          Conectar número (Coexistence) →
+        </Link>
       </div>
 
       <SimularMensagemForm />

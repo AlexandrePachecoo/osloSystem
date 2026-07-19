@@ -20,6 +20,9 @@ export type MensagemView = {
   rascunhoResposta: string | null;
   rascunhoStatus: RascunhoStatus;
   recebidaEmFmt: string;
+  // Coexistence: quando o admin já respondeu este contato pelo celular
+  // (echo do app Business). null = sem resposta pelo app detectada.
+  respondidaViaAppFmt: string | null;
 };
 
 const STATUS_RASCUNHO_LABEL: Record<RascunhoStatus, string> = {
@@ -77,6 +80,14 @@ export function MensagemCard({ mensagem }: { mensagem: MensagemView }) {
         ) : (
           <span className="inline-block rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500">
             Sem classificação
+          </span>
+        )}
+        {mensagem.respondidaViaAppFmt && editavel && (
+          <span
+            className="inline-block rounded-full bg-teal-100 px-2.5 py-0.5 text-xs font-medium text-teal-800"
+            title={`Você respondeu este contato pelo celular em ${mensagem.respondidaViaAppFmt} — se resolveu, descarte o rascunho.`}
+          >
+            Respondida pelo celular · {mensagem.respondidaViaAppFmt}
           </span>
         )}
       </div>

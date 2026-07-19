@@ -18,7 +18,8 @@ const SYSTEM_PROMPT = `Você é o assistente de gerenciamento da administração
 
 Regras:
 - Responda sempre em português do Brasil, curto e direto (1 a 4 frases).
-- Quando o administrador relatar um fato que corresponde a uma ação (problema sendo resolvido → criar serviço; aviso/informação para os moradores → salvar contexto; coisa a não esquecer → criar lembrete; material usado/comprado → movimentar estoque), execute a ação em vez de apenas responder.
+- Quando o administrador relatar um fato que corresponde a uma ação (problema sendo resolvido → criar serviço; aviso/informação para os moradores → salvar contexto; coisa a não esquecer → criar lembrete; material usado/comprado → movimentar estoque; material novo que ainda não existe no estoque → cadastrar item), execute a ação em vez de apenas responder.
+- Estoque: para ajustar a quantidade de um item que já existe, use movimentar_estoque (busque o item antes). Para um material que ainda não está cadastrado, use criar_item_estoque; confira antes com buscar_estoque para não duplicar. Se o administrador não informar a unidade de medida de um item novo, pergunte.
 - Um lembrete pode ser agendado para uma data futura ("me lembra de cobrar a empresa X dia 20", "semana que vem"): calcule a data absoluta (YYYY-MM-DD) a partir da data atual informada e passe em agendadoPara. Sem data explícita, deixe null (vale desde já).
 - Status do serviço: se alguém JÁ está executando, consertando, mexendo, já comprou/usou material ou a obra começou → "em_andamento". Se ainda é só um problema a levantar orçamento, sem ninguém contratado trabalhando → "orcamento". Use "aprovado" quando um orçamento já foi escolhido mas o trabalho ainda não começou. Na dúvida entre orçamento e andamento, havendo alguém já trabalhando, escolha "em_andamento". Ex.: "o Paulo está resolvendo o vazamento no S1" → serviço "em_andamento".
 - Valor/custo/orçamento em reais (ex.: "ficou em 2 mil", "R$ 2.000", "custou 2000"): passe SÓ o número em valorOrcamento ao criar o serviço. Nunca escreva o valor apenas na descrição — o campo próprio é valorOrcamento.
@@ -70,6 +71,13 @@ const movimentarEstoqueArgs = z.object({
   itemId: z.string().min(1),
   quantidade: z.number().int().positive(),
   tipo: z.enum(['adicionar', 'retirar']),
+});
+
+const criarItemEstoqueArgs = z.object({
+  nome: z.string().trim().min(1).max(200),
+  unidade: z.string().trim().min(1).max(20),
+  quantidade: z.number().int().min(0).default(0),
+  quantidadeMinima: z.number().int().min(0).default(0),
 });
 
 const TOOL_DEFS = [
@@ -197,7 +205,7 @@ const TOOL_DEFS = [
     function: {
       name: 'movimentar_estoque',
       description:
-        'Adiciona ou retira unidades de um item de estoque. Use buscar_estoque antes para obter o itemId.',
+        'Adiciona ou retira unidades de um item de estoque JÁ existente. Use buscar_estoque antes para obter o itemId. Para cadastrar um item novo, use criar_item_estoque.',
       parameters: {
         type: 'object',
         properties: {
@@ -206,6 +214,36 @@ const TOOL_DEFS = [
           tipo: { type: 'string', enum: ['adicionar', 'retirar'] },
         },
         required: ['itemId', 'quantidade', 'tipo'],
+        additionalProperties: false,
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'criar_item_estoque',
+      description:
+        'Cadastra um item NOVO no estoque (que ainda não existe). Antes de criar, use buscar_estoque para confirmar que o item não está cadastrado — se já existir, use movimentar_estoque em vez de criar duplicado.',
+      parameters: {
+        type: 'object',
+        properties: {
+          nome: { type: 'string', description: 'Nome do item, ex.: "Lâmpada LED 9W".' },
+          unidade: {
+            type: 'string',
+            description: 'Unidade de medida, ex.: "un", "litro", "kg", "pct".',
+          },
+          quantidade: {
+            type: 'integer',
+            minimum: 0,
+            description: 'Quantidade inicial em estoque. Use 0 se não informada.',
+          },
+          quantidadeMinima: {
+            type: 'integer',
+            minimum: 0,
+            description: 'Estoque mínimo para alerta de reposição. Use 0 se não informada.',
+          },
+        },
+        required: ['nome', 'unidade', 'quantidade', 'quantidadeMinima'],
         additionalProperties: false,
       },
     },
@@ -364,6 +402,32 @@ async function executarFerramenta(nome: string, argsJson: string): Promise<strin
           select: { nome: true, quantidade: true, unidade: true },
         });
         return JSON.stringify({ ok: true, item });
+      }
+
+      case 'criar_item_estoque': {
+        const dados = criarItemEstoqueArgs.parse(args);
+        // Evita duplicar um item já cadastrado com o mesmo nome.
+        const existente = await prisma.itemEstoque.findFirst({
+          where: { nome: { equals: dados.nome, mode: 'insensitive' } },
+          select: { id: true, nome: true, quantidade: true, unidade: true },
+        });
+        if (existente) {
+          return JSON.stringify({
+            ok: false,
+            erro: 'item já cadastrado; use movimentar_estoque para ajustar a quantidade',
+            item: existente,
+          });
+        }
+        const criado = await prisma.itemEstoque.create({
+          data: {
+            nome: dados.nome,
+            unidade: dados.unidade,
+            quantidade: dados.quantidade,
+            quantidadeMinima: dados.quantidadeMinima,
+          },
+          select: { id: true, nome: true, quantidade: true, unidade: true },
+        });
+        return JSON.stringify({ ok: true, item: criado });
       }
 
       default:
