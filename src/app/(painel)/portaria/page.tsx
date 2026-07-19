@@ -4,6 +4,7 @@ import { formatarData } from '@/lib/format';
 import { baixarEntregaEncomenda, excluirOcorrencia, excluirEncomenda } from '@/actions/portaria';
 import { PortariaRegistro } from '@/components/portaria-registro';
 import { EnviarRelatorioPortaria } from '@/components/enviar-relatorio-portaria';
+import { JornaisPortaria } from '@/components/jornais-portaria';
 import { ConfirmDeleteButton } from '@/components/confirm-delete-button';
 import type { EncomendaPortaria } from '@/generated/prisma/client';
 
@@ -174,6 +175,17 @@ export default async function PortariaPage() {
           </ul>
         )}
       </section>
+
+      {/* Jornais entregues — lista fixa de assinantes por jornal (como no
+          relatório antigo). Marcar = entregue; o envio zera as marcações. */}
+      <JornaisPortaria
+        jornais={aberto.jornais.map((j) => ({
+          id: j.id,
+          nome: j.nome,
+          torre: j.torre,
+          aptos: j.aptos.map((a) => ({ id: a.id, apto: a.apto, entregue: a.entregue })),
+        }))}
+      />
 
       {/* Últimos relatórios enviados */}
       <section className="space-y-2">

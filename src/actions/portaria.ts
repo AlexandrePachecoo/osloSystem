@@ -9,6 +9,7 @@ import {
   ocorrenciaCreateSchema,
   encomendaCreateSchema,
   enviarRelatorioSchema,
+  jornalCreateSchema,
 } from '@/schemas/portaria';
 import {
   carregarRelatorioAberto,
@@ -110,6 +111,75 @@ export async function excluirEncomenda(formData: FormData): Promise<void> {
   revalidatePath('/portaria');
 }
 
+// --- Jornais ---
+// Lista fixa de apartamentos assinantes por jornal. A portaria marca no dia
+// quais foram entregues (checkbox); o envio do relatório zera as marcações.
+
+export async function adicionarJornal(
+  _prev: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  await exigirSessao();
+  const parsed = jornalCreateSchema.safeParse({
+    nome: formData.get('nome'),
+    torre: formData.get('torre') ?? '',
+    aptos: formData.get('aptos') ?? '',
+  });
+  if (!parsed.success) {
+    return { error: parsed.error.issues[0].message };
+  }
+  const { nome, torre, aptos } = parsed.data;
+
+  const ordem = await prisma.jornalPortaria.count();
+  await prisma.jornalPortaria.create({
+    data: {
+      nome,
+      torre,
+      ordem,
+      aptos: {
+        create: aptos.map((apto, i) => ({ apto, ordem: i })),
+      },
+    },
+  });
+  revalidatePath('/portaria');
+  return { error: null };
+}
+
+// Marca/desmarca a entrega de um jornal em um apartamento (checkbox).
+export async function definirEntregaJornalApto(aptoId: string, entregue: boolean): Promise<void> {
+  await exigirSessao();
+  const id = z.cuid().parse(aptoId);
+  await prisma.jornalAptoPortaria.updateMany({
+    where: { id },
+    data: { entregue: Boolean(entregue) },
+  });
+  revalidatePath('/portaria');
+}
+
+// Acrescenta um apartamento à lista fixa de um jornal.
+export async function adicionarAptoJornal(formData: FormData): Promise<void> {
+  await exigirSessao();
+  const jornalId = z.cuid().parse(formData.get('jornalId'));
+  const apto = z.string().trim().min(1).max(20).parse(formData.get('apto'));
+  const ordem = await prisma.jornalAptoPortaria.count({ where: { jornalId } });
+  await prisma.jornalAptoPortaria.create({ data: { jornalId, apto, ordem } });
+  revalidatePath('/portaria');
+}
+
+export async function excluirAptoJornal(formData: FormData): Promise<void> {
+  await exigirSessao();
+  const id = z.cuid().parse(formData.get('id'));
+  await prisma.jornalAptoPortaria.deleteMany({ where: { id } });
+  revalidatePath('/portaria');
+}
+
+export async function excluirJornal(formData: FormData): Promise<void> {
+  await exigirSessao();
+  const id = z.cuid().parse(formData.get('id'));
+  await prisma.jornalPortaria.deleteMany({ where: { id } });
+  revalidatePath('/portaria');
+}
+
 // "Enviar para a administração": fecha o relatório aberto em um
 // RelatorioPortaria (snapshot em `dados` + resumo em texto). Ocorrências e
 // entregas baixadas são vinculadas ao relatório; pendentes ficam soltas e
@@ -128,12 +198,14 @@ export async function enviarRelatorioPortaria(
   const { colaborador } = parsed.data;
 
   const aberto = await carregarRelatorioAberto();
+  const jornaisEntregues = aberto.jornais.some((j) => j.aptos.some((a) => a.entregue));
   if (
     aberto.ocorrencias.length === 0 &&
     aberto.entregues.length === 0 &&
-    aberto.pendentes.length === 0
+    aberto.pendentes.length === 0 &&
+    !jornaisEntregues
   ) {
-    return { error: 'Nada para enviar: sem ocorrências nem encomendas no período' };
+    return { error: 'Nada para enviar: sem ocorrências, encomendas ou jornais no período' };
   }
 
   const dados = montarDados(aberto);
@@ -151,6 +223,13 @@ export async function enviarRelatorioPortaria(
       where: { id: { in: aberto.entregues.map((e) => e.id) } },
       data: { relatorioId: relatorio.id },
     });
+    // Jornais são configuração fixa: só zeramos as marcações de entrega do dia.
+    if (jornaisEntregues) {
+      await tx.jornalAptoPortaria.updateMany({
+        where: { entregue: true },
+        data: { entregue: false },
+      });
+    }
   });
 
   revalidatePath('/portaria');
