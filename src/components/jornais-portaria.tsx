@@ -1,15 +1,14 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
+import { useMemo, useRef, useState, useTransition } from 'react';
 import { useActionState } from 'react';
 import {
   adicionarAptoJornal,
   adicionarJornal,
   definirEntregaJornalApto,
+  definirEntregaVariosAptos,
   excluirAptoJornal,
-  excluirJornal,
 } from '@/actions/portaria';
-import { ConfirmDeleteButton } from '@/components/confirm-delete-button';
 import type { ActionState } from '@/actions/servicos';
 
 export type JornalView = {
@@ -19,37 +18,95 @@ export type JornalView = {
   aptos: { id: string; apto: string; entregue: boolean }[];
 };
 
+// Uma linha da tabela: um apartamento assinante de um jornal.
+type Linha = {
+  aptoId: string;
+  apto: string;
+  jornalId: string;
+  jornalNome: string;
+  entregue: boolean;
+};
+
+type Grupo = {
+  torre: string; // '' = sem torre
+  linhas: Linha[];
+  jornais: { id: string; nome: string }[]; // jornais desta torre (para "adicionar apto")
+};
+
 const inputCls =
   'w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none';
 
-// Aba de jornais: cada jornal traz sua lista fixa de apartamentos assinantes.
-// A portaria marca (checkbox) quais foram entregues no dia; ao enviar o
-// relatório, as marcações zeram. Familiar ao relatório antigo ("Jornais
-// entregues"), agrupado por torre.
+// Ordena por nome do jornal e, dentro do mesmo jornal, por apto (numérico).
+const comparador = (a: Linha, b: Linha) =>
+  a.jornalNome.localeCompare(b.jornalNome, 'pt-BR', { sensitivity: 'base' }) ||
+  a.apto.localeCompare(b.apto, 'pt-BR', { numeric: true, sensitivity: 'base' });
+
+// Monta os grupos por torre a partir dos jornais, já ordenados por nome.
+function agrupar(jornais: JornalView[]): Grupo[] {
+  const mapa = new Map<string, Grupo>();
+  for (const j of jornais) {
+    const torre = j.torre ?? '';
+    let grupo = mapa.get(torre);
+    if (!grupo) {
+      grupo = { torre, linhas: [], jornais: [] };
+      mapa.set(torre, grupo);
+    }
+    grupo.jornais.push({ id: j.id, nome: j.nome });
+    for (const a of j.aptos) {
+      grupo.linhas.push({
+        aptoId: a.id,
+        apto: a.apto,
+        jornalId: j.id,
+        jornalNome: j.nome,
+        entregue: a.entregue,
+      });
+    }
+  }
+  const grupos = [...mapa.values()];
+  for (const g of grupos) {
+    g.linhas.sort(comparador);
+    g.jornais.sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR', { sensitivity: 'base' }));
+  }
+  // Torres em ordem alfabética; "sem torre" por último.
+  grupos.sort((a, b) => {
+    if (a.torre === '') return 1;
+    if (b.torre === '') return -1;
+    return a.torre.localeCompare(b.torre, 'pt-BR', { numeric: true, sensitivity: 'base' });
+  });
+  return grupos;
+}
+
+// Aba de jornais: uma tabela por torre (lado a lado), colunas
+// check / apto / jornal. Marcar = entregue; o envio do relatório zera tudo.
 export function JornaisPortaria({ jornais: inicial }: { jornais: JornalView[] }) {
-  // Estado local espelha o servidor. Ressincroniza quando o snapshot muda
-  // (ex.: envio do relatório zera todas as entregas) via assinatura estável.
+  // Estado local espelha o servidor; ressincroniza no render quando o snapshot
+  // muda (ex.: o envio do relatório zera todas as marcações).
   const assinatura = inicial
     .map((j) => `${j.id}:${j.aptos.map((a) => `${a.id}=${a.entregue ? 1 : 0}`).join('|')}`)
     .join(';');
   const [jornais, setJornais] = useState<JornalView[]>(inicial);
   const [assinaturaAnterior, setAssinaturaAnterior] = useState(assinatura);
-  // Ressincroniza durante o render (padrão React) quando o servidor muda o
-  // snapshot — ex.: o envio do relatório zera todas as marcações de entrega.
   if (assinatura !== assinaturaAnterior) {
     setAssinaturaAnterior(assinatura);
     setJornais(inicial);
   }
 
   const [abrindo, setAbrindo] = useState(false);
+  const [, startTransition] = useTransition();
+  const grupos = useMemo(() => agrupar(jornais), [jornais]);
 
-  function marcar(aptoId: string, entregue: boolean) {
+  function marcar(aptoIds: string[], entregue: boolean) {
+    const alvo = new Set(aptoIds);
     setJornais((prev) =>
       prev.map((j) => ({
         ...j,
-        aptos: j.aptos.map((a) => (a.id === aptoId ? { ...a, entregue } : a)),
+        aptos: j.aptos.map((a) => (alvo.has(a.id) ? { ...a, entregue } : a)),
       })),
     );
+    startTransition(async () => {
+      if (aptoIds.length === 1) await definirEntregaJornalApto(aptoIds[0], entregue);
+      else await definirEntregaVariosAptos(aptoIds, entregue);
+    });
   }
 
   return (
@@ -67,14 +124,14 @@ export function JornaisPortaria({ jornais: inicial }: { jornais: JornalView[] })
 
       {abrindo && <NovoJornalForm onDone={() => setAbrindo(false)} />}
 
-      {jornais.length === 0 ? (
+      {grupos.length === 0 ? (
         <p className="text-sm text-slate-500">
           Nenhum jornal cadastrado. Use “Adicionar novo jornal” para começar.
         </p>
       ) : (
-        <div className="space-y-2">
-          {jornais.map((j) => (
-            <JornalCard key={j.id} jornal={j} onMarcar={marcar} />
+        <div className="flex flex-wrap items-start gap-4">
+          {grupos.map((g) => (
+            <TorreTabela key={g.torre || 'sem-torre'} grupo={g} onMarcar={marcar} />
           ))}
         </div>
       )}
@@ -82,89 +139,114 @@ export function JornaisPortaria({ jornais: inicial }: { jornais: JornalView[] })
   );
 }
 
-function JornalCard({
-  jornal,
+function TorreTabela({
+  grupo,
   onMarcar,
 }: {
-  jornal: JornalView;
-  onMarcar: (aptoId: string, entregue: boolean) => void;
+  grupo: Grupo;
+  onMarcar: (aptoIds: string[], entregue: boolean) => void;
 }) {
-  const [aberto, setAberto] = useState(false);
-  const [, startTransition] = useTransition();
-  const entregues = jornal.aptos.filter((a) => a.entregue).length;
-
-  function alternar(aptoId: string, entregue: boolean) {
-    onMarcar(aptoId, entregue);
-    startTransition(async () => {
-      await definirEntregaJornalApto(aptoId, entregue);
-    });
-  }
+  const [minimizado, setMinimizado] = useState(false);
+  const titulo = grupo.torre ? `Torre ${grupo.torre}` : 'Sem torre';
+  const todosIds = grupo.linhas.map((l) => l.aptoId);
+  const entregues = grupo.linhas.filter((l) => l.entregue).length;
+  const todosMarcados = grupo.linhas.length > 0 && entregues === grupo.linhas.length;
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white">
-      <button
-        type="button"
-        onClick={() => setAberto((v) => !v)}
-        className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left"
-      >
-        <span className="flex flex-wrap items-center gap-2">
-          <span className="text-slate-400">{aberto ? '▾' : '▸'}</span>
-          <span className="font-medium">{jornal.nome}</span>
-          {jornal.torre && (
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-              Torre {jornal.torre}
-            </span>
-          )}
+    <div className="min-w-[280px] flex-1 rounded-lg border border-slate-200 bg-white">
+      <div className="flex items-center justify-between gap-2 border-b border-slate-200 bg-slate-50 px-3 py-2">
+        <span className="flex items-center gap-2 font-semibold text-slate-800">
+          {titulo}
+          <span className="text-xs font-normal text-slate-500">
+            {entregues}/{grupo.linhas.length}
+          </span>
         </span>
-        <span className="text-xs text-slate-500">
-          {entregues}/{jornal.aptos.length} entregues
-        </span>
-      </button>
-
-      {aberto && (
-        <div className="space-y-3 border-t border-slate-100 px-4 py-3">
-          {jornal.aptos.length === 0 ? (
-            <p className="text-sm text-slate-500">Nenhum apartamento cadastrado neste jornal.</p>
-          ) : (
-            <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2 lg:grid-cols-3">
-              {jornal.aptos.map((a) => (
-                <li key={a.id} className="flex items-center justify-between gap-2">
-                  <label className="flex flex-1 items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={a.entregue}
-                      onChange={(e) => alternar(a.id, e.target.checked)}
-                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    <span className={a.entregue ? 'font-medium text-slate-900' : 'text-slate-600'}>
-                      {a.apto}
-                    </span>
-                  </label>
-                  <ConfirmDeleteButton
-                    action={excluirAptoJornal}
-                    id={a.id}
-                    mensagem={`Remover o apto ${a.apto} deste jornal?`}
-                  />
-                </li>
-              ))}
-            </ul>
+        <div className="flex items-center gap-1">
+          {!minimizado && grupo.linhas.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onMarcar(todosIds, !todosMarcados)}
+              className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-white"
+            >
+              {todosMarcados ? 'Desmarcar todos' : 'Marcar todos'}
+            </button>
           )}
-
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-3">
-            <AdicionarAptoForm jornalId={jornal.id} />
-            <ConfirmDeleteButton
-              action={excluirJornal}
-              id={jornal.id}
-              mensagem={`Excluir o jornal “${jornal.nome}” e todos os seus apartamentos?`}
-            />
-          </div>
+          <button
+            type="button"
+            onClick={() => setMinimizado((v) => !v)}
+            aria-label={minimizado ? 'Expandir' : 'Minimizar'}
+            className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700 hover:bg-white"
+          >
+            {minimizado ? '▸' : '▾'}
+          </button>
         </div>
+      </div>
+
+      {!minimizado && (
+        <>
+          {grupo.linhas.length === 0 ? (
+            <p className="px-3 py-3 text-sm text-slate-500">Nenhum apartamento cadastrado.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs uppercase tracking-wide text-slate-400">
+                <tr>
+                  <th className="w-8 px-3 py-2" />
+                  <th className="px-2 py-2">Apto</th>
+                  <th className="px-2 py-2">Jornal</th>
+                  <th className="w-8 px-2 py-2" />
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {grupo.linhas.map((l) => (
+                  <tr key={l.aptoId} className="hover:bg-slate-50">
+                    <td className="px-3 py-1.5">
+                      <input
+                        type="checkbox"
+                        checked={l.entregue}
+                        onChange={(e) => onMarcar([l.aptoId], e.target.checked)}
+                        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                      />
+                    </td>
+                    <td
+                      className={`px-2 py-1.5 ${l.entregue ? 'font-medium text-slate-900' : 'text-slate-600'}`}
+                    >
+                      {l.apto}
+                    </td>
+                    <td
+                      className={`px-2 py-1.5 ${l.entregue ? 'text-slate-900' : 'text-slate-600'}`}
+                    >
+                      {l.jornalNome}
+                    </td>
+                    <td className="px-2 py-1.5 text-right">
+                      <form
+                        action={excluirAptoJornal}
+                        onSubmit={(e) => {
+                          if (!confirm(`Remover ${l.apto} — ${l.jornalNome}?`)) e.preventDefault();
+                        }}
+                      >
+                        <input type="hidden" name="id" value={l.aptoId} />
+                        <button
+                          type="submit"
+                          aria-label="Remover"
+                          className="text-slate-300 hover:text-red-600"
+                        >
+                          ✕
+                        </button>
+                      </form>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+          {grupo.jornais.length > 0 && <AdicionarAptoForm jornais={grupo.jornais} />}
+        </>
       )}
     </div>
   );
 }
 
-function AdicionarAptoForm({ jornalId }: { jornalId: string }) {
+function AdicionarAptoForm({ jornais }: { jornais: { id: string; nome: string }[] }) {
   const formRef = useRef<HTMLFormElement>(null);
   return (
     <form
@@ -173,21 +255,31 @@ function AdicionarAptoForm({ jornalId }: { jornalId: string }) {
         await adicionarAptoJornal(formData);
         formRef.current?.reset();
       }}
-      className="flex items-center gap-2"
+      className="flex items-center gap-2 border-t border-slate-100 px-3 py-2"
     >
-      <input type="hidden" name="jornalId" value={jornalId} />
       <input
         name="apto"
         required
         maxLength={20}
-        placeholder="Novo apto (ex.: 703 A)"
-        className="w-40 rounded-md border border-slate-300 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none"
+        placeholder="Apto"
+        className="w-20 rounded-md border border-slate-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
       />
+      <select
+        name="jornalId"
+        defaultValue={jornais[0]?.id}
+        className="flex-1 rounded-md border border-slate-300 px-2 py-1 text-sm focus:border-blue-500 focus:outline-none"
+      >
+        {jornais.map((j) => (
+          <option key={j.id} value={j.id}>
+            {j.nome}
+          </option>
+        ))}
+      </select>
       <button
         type="submit"
-        className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        className="rounded-md border border-slate-300 px-2 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50"
       >
-        Adicionar apto
+        +
       </button>
     </form>
   );
