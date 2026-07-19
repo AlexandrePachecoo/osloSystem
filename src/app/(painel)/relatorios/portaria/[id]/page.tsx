@@ -3,7 +3,11 @@ import { notFound } from 'next/navigation';
 import { prisma } from '@/lib/prisma';
 import { CopyButton } from '@/components/copy-button';
 import { formatarData } from '@/lib/format';
-import { descreverEncomenda, type DadosRelatorioPortaria } from '@/lib/portaria';
+import {
+  agruparJornaisPorTorre,
+  descreverEncomenda,
+  type DadosRelatorioPortaria,
+} from '@/lib/portaria';
 
 export const dynamic = 'force-dynamic';
 
@@ -72,6 +76,34 @@ export default async function RelatorioPortariaDetalhePage({
               </li>
             ))}
           </ul>
+        )}
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="text-lg font-medium">Jornais entregues</h2>
+        {!dados.jornais || dados.jornais.length === 0 ? (
+          <p className="text-sm text-slate-500">Nenhum jornal entregue no período.</p>
+        ) : (
+          <div className="space-y-3">
+            {agruparJornaisPorTorre(dados.jornais).map(([torre, doTorre]) => (
+              <div key={torre || 'sem-torre'} className="space-y-1">
+                {torre && (
+                  <p className="text-sm font-semibold text-slate-700">Torre {torre}</p>
+                )}
+                <ul className="space-y-1">
+                  {doTorre.map((j, i) => (
+                    <li
+                      key={i}
+                      className="rounded-md border border-slate-200 bg-white px-4 py-2 text-sm"
+                    >
+                      <span className="font-medium">{j.nome}:</span>{' '}
+                      {j.aptosEntregues.join(', ')}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
         )}
       </section>
 
