@@ -156,6 +156,21 @@ export async function definirEntregaJornalApto(aptoId: string, entregue: boolean
   revalidatePath('/portaria');
 }
 
+// Marca/desmarca vários apartamentos de uma vez (botão "marcar todos").
+export async function definirEntregaVariosAptos(
+  aptoIds: string[],
+  entregue: boolean,
+): Promise<void> {
+  await exigirSessao();
+  const ids = z.array(z.cuid()).max(2000).parse(aptoIds);
+  if (ids.length === 0) return;
+  await prisma.jornalAptoPortaria.updateMany({
+    where: { id: { in: ids } },
+    data: { entregue: Boolean(entregue) },
+  });
+  revalidatePath('/portaria');
+}
+
 // Acrescenta um apartamento à lista fixa de um jornal.
 export async function adicionarAptoJornal(formData: FormData): Promise<void> {
   await exigirSessao();
